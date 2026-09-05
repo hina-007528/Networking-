@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "display": "StormFiber base",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "noImplicitOverride": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "baseUrl": "../../",
+    // Shared packages are consumed as TypeScript source through these aliases. Resolution is
+    // then identical on every host and never depends on symlinked node_modules entries.
+    "paths": {
+      "@stormfiber/types": ["packages/types/src/index.ts"],
+      "@stormfiber/types/*": ["packages/types/src/*"],
+      "@stormfiber/validation": ["packages/validation/src/index.ts"],
+      "@stormfiber/validation/*": ["packages/validation/src/*"],
+      "@stormfiber/config": ["packages/config/src/index.ts"],
+      "@stormfiber/config/*": ["packages/config/src/*"],
+      "@stormfiber/ui": ["packages/ui/src/index.ts"],
+      "@stormfiber/ui/*": ["packages/ui/src/*"]
+    }
+  },
+  "exclude": ["node_modules", "dist", ".next", "coverage"]
+}

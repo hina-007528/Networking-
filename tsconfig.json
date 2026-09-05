@@ -1,0 +1,5 @@
+{
+  "//": "Editor-only root project. Each app and package owns the tsconfig its build actually uses.",
+  "extends": "./packages/typescript-config/base.json",
+  "files": []
+}

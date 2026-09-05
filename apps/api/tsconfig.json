@@ -1,0 +1,19 @@
+{
+  "extends": "../../packages/typescript-config/nestjs.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "../../",
+    "types": ["node"],
+    "paths": {
+      "@stormfiber/types": ["packages/types/src/index.ts"],
+      "@stormfiber/types/*": ["packages/types/src/*"],
+      "@stormfiber/validation": ["packages/validation/src/index.ts"],
+      "@stormfiber/validation/*": ["packages/validation/src/*"],
+      "@stormfiber/config": ["packages/config/src/index.ts"],
+      "@stormfiber/config/*": ["packages/config/src/*"],
+      "@/*": ["apps/api/src/*"]
+    }
+  },
+  "include": ["src/**/*.ts", "prisma/**/*.ts", "test/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}

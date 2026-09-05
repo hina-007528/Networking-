@@ -1,0 +1,48 @@
+{
+  "name": "stormfiber-platform",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Production-grade ISP platform: public website, customer portal, admin console and API",
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "test:e2e": "pnpm --filter @stormfiber/web test:e2e",
+    "clean": "turbo run clean",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
+    "db:generate": "pnpm --filter @stormfiber/api prisma:generate",
+    "db:migrate": "pnpm --filter @stormfiber/api prisma:migrate",
+    "db:deploy": "pnpm --filter @stormfiber/api prisma:deploy",
+    "db:seed": "pnpm --filter @stormfiber/api prisma:seed",
+    "db:validate": "pnpm --filter @stormfiber/api prisma:validate",
+    "db:studio": "pnpm --filter @stormfiber/api prisma:studio",
+    "docker:dev": "docker compose -f docker-compose.dev.yml up -d",
+    "docker:dev:down": "docker compose -f docker-compose.dev.yml down",
+    "docker:prod": "docker compose up -d --build"
+  },
+  "dependencies": {
+    "zod": "3.24.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.18.0",
+    "@types/node": "22.10.7",
+    "eslint": "9.18.0",
+    "eslint-plugin-react": "7.37.4",
+    "eslint-plugin-react-hooks": "5.1.0",
+    "globals": "15.14.0",
+    "prettier": "3.4.2",
+    "rimraf": "6.0.1",
+    "tsx": "4.19.2",
+    "turbo": "2.3.3",
+    "typescript": "5.7.3",
+    "typescript-eslint": "8.21.0",
+    "vitest": "2.1.8"
+  }
+}

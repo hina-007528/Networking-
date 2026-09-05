@@ -1,0 +1,64 @@
+# Local development infrastructure.
+#
+# This file deliberately contains only backing services. The applications themselves run on the
+# host through `pnpm dev`, which keeps hot reload fast and avoids bind-mount performance problems
+# on Windows and macOS. The full containerised stack lives in docker-compose.yml.
+
+name: stormfiber-dev
+
+services:
+  postgres:
+    image: postgres:16.6-alpine
+    container_name: stormfiber-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-stormfiber}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-stormfiber}
+      POSTGRES_DB: ${POSTGRES_DB:-stormfiber}
+      # Deterministic collation keeps ORDER BY results identical across developer machines.
+      POSTGRES_INITDB_ARGS: '--locale=C --encoding=UTF8'
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-stormfiber} -d ${POSTGRES_DB:-stormfiber}']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: stormfiber-redis
+    restart: unless-stopped
+    # Persistence is on so a restart does not silently drop queued jobs mid-development.
+    command: redis-server --appendonly yes --save 60 1000
+    ports:
+      - '${REDIS_PORT:-6379}:6379'
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  # Captures every outbound email locally so the notification templates can be reviewed without
+  # a real SMTP account. Set MAIL_PROVIDER=smtp and SMTP_HOST=localhost SMTP_PORT=1025 to use it.
+  mailpit:
+    image: axllent/mailpit:v1.21
+    container_name: stormfiber-mailpit
+    restart: unless-stopped
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+    ports:
+      - '${MAILPIT_SMTP_PORT:-1025}:1025'
+      - '${MAILPIT_UI_PORT:-8025}:8025'
+
+volumes:
+  postgres-data:
+    name: stormfiber-postgres-data
+  redis-data:
+    name: stormfiber-redis-data

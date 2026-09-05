@@ -1,0 +1,15 @@
+{
+  "name": "@stormfiber/typescript-config",
+  "version": "1.0.0",
+  "private": true,
+  "files": ["base.json", "library.json", "nextjs.json", "nestjs.json"],
+  "scripts": {
+    "lint": "echo \"typescript-config exposes configuration only\"",
+    "typecheck": "echo \"typescript-config exposes configuration only\"",
+    "test": "echo \"typescript-config exposes configuration only\"",
+    "clean": "rimraf .turbo"
+  },
+  "devDependencies": {
+    "rimraf": "6.0.1"
+  }
+}

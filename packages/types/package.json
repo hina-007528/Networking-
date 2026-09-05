@@ -1,0 +1,22 @@
+{
+  "name": "@stormfiber/types",
+  "version": "1.0.0",
+  "private": true,
+  "//": "Just-in-time internal package: consumers compile the TypeScript source directly through the workspace path aliases declared in tsconfig.base.json.",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "test": "echo \"no runtime code in @stormfiber/types\"",
+    "clean": "rimraf dist .turbo"
+  },
+  "devDependencies": {
+    "eslint": "9.18.0",
+    "rimraf": "6.0.1",
+    "typescript": "5.7.3"
+  }
+}
