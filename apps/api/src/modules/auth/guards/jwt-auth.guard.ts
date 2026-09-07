@@ -5,8 +5,8 @@ import {
   Inject,
   Injectable,
 } from '@nestjs/common';
-import { type Reflector } from '@nestjs/core';
-import { type JwtService } from '@nestjs/jwt';
+import { Reflector } from '@nestjs/core';
+import { JwtService } from '@nestjs/jwt';
 import type { Request } from 'express';
 import type { Permission, RoleName } from '@stormfiber/types';
 import { APP_CONFIG, type AppConfig } from '../../../config/configuration';

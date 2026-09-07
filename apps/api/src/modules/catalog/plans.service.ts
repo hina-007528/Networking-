@@ -6,14 +6,30 @@ import type {
   PlanAddonDto,
   PlanCategoryDto,
   PlanDto,
+  PlanPriceDto,
   PromotionDto,
+  TaxRuleDto,
 } from '@stormfiber/types';
-import type { planCompareSchema, planFilterSchema } from '@stormfiber/validation';
+import type {
+  adminPlanListQuerySchema,
+  planCompareSchema,
+  planFilterSchema,
+  upsertPlanAddonSchema,
+  upsertPlanCategorySchema,
+  upsertPlanPriceSchema,
+  upsertPlanSchema,
+  upsertPromotionSchema,
+  upsertTaxRuleSchema,
+} from '@stormfiber/validation';
 import type { z } from 'zod';
-import { CacheKeys, type CacheService } from '../../common/cache/cache.service';
+import { AuditAction, AuditService } from '../../common/audit/audit.service';
+import { CacheKeys, CacheNamespaces, CacheService } from '../../common/cache/cache.service';
+import type { RequestContext } from '../../common/decorators/auth.decorators';
 import { AppException } from '../../common/errors/app.exception';
-import { type PrismaService } from '../../common/prisma/prisma.service';
+import { PrismaService } from '../../common/prisma/prisma.service';
+import { money, toNumber } from '../../common/utils/money';
 import { buildPaginationMeta, toPrismaPagination } from '../../common/utils/pagination';
+import { throwIfUniqueConflict } from '../../common/utils/prisma-errors';
 import {
   isPromotionLive,
   planInclude,
@@ -25,6 +41,13 @@ import {
 
 export type PlanFilterPayload = z.output<typeof planFilterSchema>;
 export type PlanComparePayload = z.output<typeof planCompareSchema>;
+export type AdminPlanListQuery = z.output<typeof adminPlanListQuerySchema>;
+export type UpsertPlanPayload = z.output<typeof upsertPlanSchema>;
+export type UpsertPlanPricePayload = z.output<typeof upsertPlanPriceSchema>;
+export type UpsertPlanAddonPayload = z.output<typeof upsertPlanAddonSchema>;
+export type UpsertPlanCategoryPayload = z.output<typeof upsertPlanCategorySchema>;
+export type UpsertPromotionPayload = z.output<typeof upsertPromotionSchema>;
+export type UpsertTaxRulePayload = z.output<typeof upsertTaxRuleSchema>;
 
 const CATALOG_TTL_SECONDS = 600;
 
@@ -48,6 +71,7 @@ export class PlansService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cache: CacheService,
+    private readonly audit: AuditService,
   ) {}
 
   async list(filter: PlanFilterPayload): Promise<Paginated<PlanDto>> {
@@ -274,5 +298,459 @@ export class PlansService {
     }
 
     return city.slug;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Admin writes
+  // ---------------------------------------------------------------------------
+
+  async listAdmin(query: AdminPlanListQuery): Promise<Paginated<PlanDto>> {
+    const { skip, take } = toPrismaPagination(query);
+    const where: Prisma.PlanWhereInput = {
+      deletedAt: null,
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.kind ? { kind: query.kind } : {}),
+      ...(query.search
+        ? {
+            OR: [
+              { name: { contains: query.search, mode: 'insensitive' } },
+              { slug: { contains: query.search, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+    };
+
+    const [rows, total] = await this.prisma.$transaction([
+      this.prisma.plan.findMany({
+        where,
+        include: planInclude,
+        orderBy: [{ displayOrder: 'asc' }, { name: 'asc' }],
+        skip,
+        take,
+      }),
+      this.prisma.plan.count({ where }),
+    ]);
+
+    return {
+      items: rows.map((row) => toPlanDto(row, null)),
+      pagination: buildPaginationMeta(query, total),
+    };
+  }
+
+  async getById(id: string): Promise<PlanDto> {
+    const plan = await this.prisma.plan.findFirst({
+      where: { id, deletedAt: null },
+      include: planInclude,
+    });
+
+    if (!plan) {
+      throw AppException.notFound('Plan');
+    }
+
+    return toPlanDto(plan, null);
+  }
+
+  async createPlan(input: UpsertPlanPayload, actorId: string, context: RequestContext): Promise<PlanDto> {
+    try {
+      const created = await this.prisma.$transaction(async (tx) => {
+        const plan = await tx.plan.create({
+          data: this.planWriteData(input),
+        });
+        await this.replacePlanRelations(tx, plan.id, input);
+        return plan.id;
+      });
+
+      await this.afterCatalogWrite(actorId, context, created, AuditAction.PLAN_CREATED, input);
+      return this.getById(created);
+    } catch (error) {
+      throwIfUniqueConflict(error, 'A plan with that slug already exists');
+    }
+  }
+
+  async updatePlan(
+    id: string,
+    input: UpsertPlanPayload,
+    actorId: string,
+    context: RequestContext,
+  ): Promise<PlanDto> {
+    const existing = await this.prisma.plan.findFirst({
+      where: { id, deletedAt: null },
+      select: { id: true, status: true },
+    });
+
+    if (!existing) {
+      throw AppException.notFound('Plan');
+    }
+
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.plan.update({ where: { id }, data: this.planWriteData(input) });
+        await this.replacePlanRelations(tx, id, input);
+      });
+    } catch (error) {
+      throwIfUniqueConflict(error, 'A plan with that slug already exists');
+    }
+
+    const published = existing.status !== 'PUBLISHED' && input.status === 'PUBLISHED';
+    await this.afterCatalogWrite(
+      actorId,
+      context,
+      id,
+      published ? AuditAction.PLAN_PUBLISHED : AuditAction.PLAN_UPDATED,
+      input,
+    );
+    return this.getById(id);
+  }
+
+  async archivePlan(id: string, actorId: string, context: RequestContext): Promise<void> {
+    const existing = await this.prisma.plan.findFirst({
+      where: { id, deletedAt: null },
+      select: { id: true },
+    });
+    if (!existing) {
+      throw AppException.notFound('Plan');
+    }
+
+    await this.prisma.plan.update({
+      where: { id },
+      data: { deletedAt: new Date(), status: 'ARCHIVED' },
+    });
+    await this.afterCatalogWrite(actorId, context, id, AuditAction.PLAN_UPDATED, { archived: true });
+  }
+
+  async listPrices(planId: string): Promise<PlanPriceDto[]> {
+    const rows = await this.prisma.planPrice.findMany({
+      where: { planId },
+      include: { city: { select: { name: true, slug: true } } },
+      orderBy: { city: { name: 'asc' } },
+    });
+
+    return rows.map((row) => ({
+      id: row.id,
+      planId: row.planId,
+      cityId: row.cityId,
+      cityName: row.city.name,
+      citySlug: row.city.slug,
+      monthlyPrice: toNumber(row.monthlyPrice),
+      installationPrice: toNumber(row.installationPrice),
+      currency: row.currency,
+      isActive: row.isActive,
+    }));
+  }
+
+  async upsertPrice(
+    input: UpsertPlanPricePayload,
+    actorId: string,
+    context: RequestContext,
+  ): Promise<PlanPriceDto> {
+    const row = await this.prisma.planPrice.upsert({
+      where: { planId_cityId: { planId: input.planId, cityId: input.cityId } },
+      create: {
+        planId: input.planId,
+        cityId: input.cityId,
+        monthlyPrice: money(input.monthlyPrice),
+        installationPrice: money(input.installationPrice),
+        currency: input.currency,
+        isActive: input.isActive,
+      },
+      update: {
+        monthlyPrice: money(input.monthlyPrice),
+        installationPrice: money(input.installationPrice),
+        currency: input.currency,
+        isActive: input.isActive,
+      },
+      include: { city: { select: { name: true, slug: true } } },
+    });
+
+    await this.afterCatalogWrite(actorId, context, input.planId, AuditAction.PLAN_PRICE_CHANGED, input);
+    return {
+      id: row.id,
+      planId: row.planId,
+      cityId: row.cityId,
+      cityName: row.city.name,
+      citySlug: row.city.slug,
+      monthlyPrice: toNumber(row.monthlyPrice),
+      installationPrice: toNumber(row.installationPrice),
+      currency: row.currency,
+      isActive: row.isActive,
+    };
+  }
+
+  async listAllAddons(): Promise<PlanAddonDto[]> {
+    const rows = await this.prisma.planAddon.findMany({
+      where: { deletedAt: null },
+      orderBy: [{ displayOrder: 'asc' }, { name: 'asc' }],
+    });
+    return rows.map(toPlanAddonDto);
+  }
+
+  async upsertAddon(
+    input: UpsertPlanAddonPayload,
+    actorId: string,
+    context: RequestContext,
+    id?: string,
+  ): Promise<PlanAddonDto> {
+    try {
+      const row = id
+        ? await this.prisma.planAddon.update({
+            where: { id },
+            data: {
+              name: input.name,
+              slug: input.slug,
+              description: input.description ?? null,
+              serviceType: input.serviceType,
+              monthlyPrice: money(input.monthlyPrice),
+              oneTimePrice: money(input.oneTimePrice),
+              currency: input.currency,
+              isActive: input.isActive,
+              displayOrder: input.displayOrder,
+            },
+          })
+        : await this.prisma.planAddon.create({
+            data: {
+              name: input.name,
+              slug: input.slug,
+              description: input.description ?? null,
+              serviceType: input.serviceType,
+              monthlyPrice: money(input.monthlyPrice),
+              oneTimePrice: money(input.oneTimePrice),
+              currency: input.currency,
+              isActive: input.isActive,
+              displayOrder: input.displayOrder,
+            },
+          });
+
+      await this.afterCatalogWrite(actorId, context, row.id, AuditAction.PLAN_UPDATED, input);
+      return toPlanAddonDto(row);
+    } catch (error) {
+      throwIfUniqueConflict(error, 'An add-on with that slug already exists');
+    }
+  }
+
+  async upsertCategory(
+    input: UpsertPlanCategoryPayload,
+    actorId: string,
+    context: RequestContext,
+    id?: string,
+  ): Promise<PlanCategoryDto> {
+    try {
+      const row = id
+        ? await this.prisma.planCategory.update({
+            where: { id },
+            data: input,
+          })
+        : await this.prisma.planCategory.create({ data: input });
+
+      await this.afterCatalogWrite(actorId, context, row.id, AuditAction.PLAN_UPDATED, input);
+      return toPlanCategoryDto(row);
+    } catch (error) {
+      throwIfUniqueConflict(error, 'A category with that slug already exists');
+    }
+  }
+
+  async listAllPromotions(): Promise<PromotionDto[]> {
+    const rows = await this.prisma.promotion.findMany({
+      where: { deletedAt: null },
+      orderBy: [{ startsAt: 'desc' }, { name: 'asc' }],
+    });
+    return rows.map(toPromotionDto);
+  }
+
+  async upsertPromotion(
+    input: UpsertPromotionPayload,
+    actorId: string,
+    context: RequestContext,
+    id?: string,
+  ): Promise<PromotionDto> {
+    try {
+      const row = id
+        ? await this.prisma.promotion.update({
+            where: { id },
+            data: {
+              name: input.name,
+              slug: input.slug,
+              description: input.description ?? null,
+              discountKind: input.discountKind,
+              discountValue: money(input.discountValue),
+              durationMonths: input.durationMonths ?? null,
+              badgeText: input.badgeText ?? null,
+              code: input.code ?? null,
+              status: input.status,
+              startsAt: input.startsAt ?? null,
+              endsAt: input.endsAt ?? null,
+              imageUrl: input.imageUrl ?? null,
+            },
+          })
+        : await this.prisma.promotion.create({
+            data: {
+              name: input.name,
+              slug: input.slug,
+              description: input.description ?? null,
+              discountKind: input.discountKind,
+              discountValue: money(input.discountValue),
+              durationMonths: input.durationMonths ?? null,
+              badgeText: input.badgeText ?? null,
+              code: input.code ?? null,
+              status: input.status,
+              startsAt: input.startsAt ?? null,
+              endsAt: input.endsAt ?? null,
+              imageUrl: input.imageUrl ?? null,
+            },
+          });
+
+      await this.afterCatalogWrite(actorId, context, row.id, AuditAction.PROMOTION_UPDATED, input);
+      return toPromotionDto(row);
+    } catch (error) {
+      throwIfUniqueConflict(error, 'A promotion with that slug or code already exists');
+    }
+  }
+
+  async listTaxRules(): Promise<TaxRuleDto[]> {
+    const rows = await this.prisma.taxRule.findMany({ orderBy: { code: 'asc' } });
+    return rows.map((row) => ({
+      id: row.id,
+      code: row.code,
+      label: row.label,
+      kind: row.kind,
+      rate: toNumber(row.rate),
+      fixedAmount: toNumber(row.fixedAmount),
+      appliesTo: row.appliesTo,
+      isActive: row.isActive,
+      effectiveFrom: row.effectiveFrom?.toISOString() ?? null,
+      effectiveTo: row.effectiveTo?.toISOString() ?? null,
+    }));
+  }
+
+  async upsertTaxRule(
+    input: UpsertTaxRulePayload,
+    actorId: string,
+    context: RequestContext,
+    id?: string,
+  ): Promise<TaxRuleDto> {
+    try {
+      const row = id
+        ? await this.prisma.taxRule.update({
+            where: { id },
+            data: {
+              code: input.code,
+              label: input.label,
+              kind: input.kind,
+              rate: money(input.rate),
+              fixedAmount: money(input.fixedAmount),
+              appliesTo: input.appliesTo,
+              isActive: input.isActive,
+              effectiveFrom: input.effectiveFrom ?? null,
+              effectiveTo: input.effectiveTo ?? null,
+            },
+          })
+        : await this.prisma.taxRule.create({
+            data: {
+              code: input.code,
+              label: input.label,
+              kind: input.kind,
+              rate: money(input.rate),
+              fixedAmount: money(input.fixedAmount),
+              appliesTo: input.appliesTo,
+              isActive: input.isActive,
+              effectiveFrom: input.effectiveFrom ?? null,
+              effectiveTo: input.effectiveTo ?? null,
+            },
+          });
+
+      await this.afterCatalogWrite(actorId, context, row.id, AuditAction.PLAN_PRICE_CHANGED, input);
+      return (await this.listTaxRules()).find((rule) => rule.id === row.id)!;
+    } catch (error) {
+      throwIfUniqueConflict(error, 'A tax rule with that code already exists');
+    }
+  }
+
+  private planWriteData(input: UpsertPlanPayload): Prisma.PlanUncheckedCreateInput {
+    return {
+      name: input.name,
+      slug: input.slug,
+      description: input.description,
+      shortDescription: input.shortDescription ?? null,
+      kind: input.kind,
+      categoryId: input.categoryId ?? null,
+      promotionId: input.promotionId ?? null,
+      services: input.services,
+      speedMbps: input.speedMbps ?? null,
+      uploadMbps: input.uploadMbps ?? null,
+      tvChannels: input.tvChannels ?? null,
+      voiceMinutes: input.voiceMinutes ?? null,
+      monthlyPrice: money(input.monthlyPrice),
+      installationPrice: money(input.installationPrice),
+      currency: input.currency,
+      status: input.status,
+      featured: input.featured,
+      displayOrder: input.displayOrder,
+      badgeText: input.badgeText ?? null,
+      metadata: (input.metadata ?? {}) as Prisma.InputJsonValue,
+      seoTitle: input.seoTitle ?? null,
+      seoDescription: input.seoDescription ?? null,
+      publishedAt: input.status === 'PUBLISHED' ? (input.publishedAt ?? new Date()) : (input.publishedAt ?? null),
+      expiresAt: input.expiresAt ?? null,
+    };
+  }
+
+  private async replacePlanRelations(
+    tx: Prisma.TransactionClient,
+    planId: string,
+    input: UpsertPlanPayload,
+  ): Promise<void> {
+    await tx.planFeature.deleteMany({ where: { planId } });
+    if (input.features.length > 0) {
+      await tx.planFeature.createMany({
+        data: input.features.map((feature) => ({
+          planId,
+          label: feature.label,
+          value: feature.value ?? null,
+          iconKey: feature.iconKey ?? null,
+          highlighted: feature.highlighted,
+          displayOrder: feature.displayOrder,
+        })),
+      });
+    }
+
+    await tx.planAddonLink.deleteMany({ where: { planId } });
+    if (input.addonIds.length > 0) {
+      await tx.planAddonLink.createMany({
+        data: input.addonIds.map((addonId) => ({ planId, addonId })),
+      });
+    }
+
+    if (input.cityIds.length > 0) {
+      for (const cityId of input.cityIds) {
+        await tx.planPrice.upsert({
+          where: { planId_cityId: { planId, cityId } },
+          create: {
+            planId,
+            cityId,
+            monthlyPrice: money(input.monthlyPrice),
+            installationPrice: money(input.installationPrice),
+            currency: input.currency,
+          },
+          update: {},
+        });
+      }
+    }
+  }
+
+  private async afterCatalogWrite(
+    actorId: string,
+    context: RequestContext,
+    entityId: string,
+    action: AuditAction,
+    newValue: unknown,
+  ): Promise<void> {
+    await this.cache.invalidateNamespace(CacheNamespaces.catalog);
+    await this.audit.record({
+      userId: actorId,
+      action,
+      entity: 'Plan',
+      entityId,
+      newValue,
+      context,
+    });
   }
 }

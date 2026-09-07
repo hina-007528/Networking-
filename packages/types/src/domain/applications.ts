@@ -76,6 +76,7 @@ export interface CallbackRequestDto {
   cityId: string | null;
   cityName: string | null;
   areaId: string | null;
+  areaName: string | null;
   preferredTime: string | null;
   subject: string;
   message: string | null;

@@ -1,0 +1,33 @@
+{
+  "extends": "../../packages/typescript-config/nextjs.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ],
+      "@stormfiber/config": [
+        "../../packages/config/src/index.ts"
+      ],
+      "@stormfiber/types": [
+        "../../packages/types/src/index.ts"
+      ],
+      "@stormfiber/ui": [
+        "../../packages/ui/src/index.ts"
+      ],
+      "@stormfiber/validation": [
+        "../../packages/validation/src/index.ts"
+      ]
+    },
+    "isolatedModules": true
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "next-env.d.ts",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}

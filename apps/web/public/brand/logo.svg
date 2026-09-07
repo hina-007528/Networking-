@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 120" fill="none">
+  <defs>
+    <linearGradient id="globe" x1="18" y1="12" x2="96" y2="108" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7FD1F0"/>
+      <stop offset="0.45" stop-color="#2E86DE"/>
+      <stop offset="1" stop-color="#0C2340"/>
+    </linearGradient>
+    <linearGradient id="xmark" x1="312" y1="22" x2="352" y2="78" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2E86DE"/>
+      <stop offset="1" stop-color="#6C63FF"/>
+    </linearGradient>
+  </defs>
+  <g stroke="url(#globe)" stroke-width="2.4" stroke-linecap="round">
+    <circle cx="58" cy="60" r="42" fill="none"/>
+    <ellipse cx="58" cy="60" rx="20" ry="42"/>
+    <ellipse cx="58" cy="60" rx="42" ry="16"/>
+    <path d="M18 48h80M18 72h80M30 28c18 10 38 10 56 0M30 92c18-10 38-10 56 0"/>
+  </g>
+  <circle cx="30" cy="40" r="3" fill="#7FD1F0"/>
+  <circle cx="58" cy="18" r="3" fill="#2E86DE"/>
+  <circle cx="86" cy="40" r="3" fill="#145DA0"/>
+  <circle cx="86" cy="80" r="3" fill="#0C2340"/>
+  <circle cx="58" cy="102" r="3" fill="#145DA0"/>
+  <circle cx="30" cy="80" r="3" fill="#2E86DE"/>
+  <circle cx="58" cy="60" r="3.5" fill="#2E86DE"/>
+  <path d="M118 28v64" stroke="#D1D5DB" stroke-width="1.5"/>
+  <text x="136" y="62" font-family="Inter, Montserrat, Arial, sans-serif" font-size="32" font-weight="800" letter-spacing="1.5" fill="#0C2340">MAJAWAR</text>
+  <text x="312" y="66" font-family="Inter, Montserrat, Arial, sans-serif" font-size="40" font-weight="800" fill="url(#xmark)">X</text>
+  <text x="346" y="62" font-family="Inter, Montserrat, Arial, sans-serif" font-size="32" font-weight="800" letter-spacing="1.5" fill="#0C2340">NETWORK</text>
+  <text x="136" y="92" font-family="Inter, Arial, sans-serif" font-size="16" fill="#6B7280">Built for Speed - Made for You.</text>
+</svg>

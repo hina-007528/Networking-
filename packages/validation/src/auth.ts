@@ -17,7 +17,11 @@ export const registerSchema = z
     mobile: mobileSchema,
     password: passwordSchema,
     confirmPassword: z.string(),
-    cityId: uuidSchema.optional(),
+    cityId: z.preprocess(
+      (value) => (value === '' || value === null ? undefined : value),
+      uuidSchema.optional(),
+    ),
+    cityName: z.string().trim().min(2).max(80).optional(),
     acceptedTerms: z.literal(true, {
       errorMap: () => ({ message: 'You must accept the terms and conditions' }),
     }),
@@ -31,7 +35,11 @@ export const registerSchema = z
 export const registerApiSchema = registerSchema
   .innerType()
   .omit({ confirmPassword: true })
-  .extend({ verificationToken: z.string().min(10).optional() });
+  .extend({
+    verificationToken: z.string().min(10).optional(),
+    cityName: z.string().trim().min(2).max(80).optional(),
+    planSlug: z.string().trim().max(120).optional(),
+  });
 
 export const loginSchema = z.object({
   identifier: z
@@ -43,11 +51,21 @@ export const loginSchema = z.object({
   rememberMe: z.boolean().default(false),
 });
 
-export const otpRequestSchema = z.object({
-  mobile: mobileSchema,
-  purpose: otpPurposeSchema,
-  email: emailSchema.optional(),
-});
+export const otpRequestSchema = z
+  .object({
+    mobile: mobileSchema,
+    purpose: otpPurposeSchema,
+    email: emailSchema.optional(),
+  })
+  .superRefine((value, ctx) => {
+    if ((value.purpose === 'REGISTRATION' || value.purpose === 'APPLICATION') && !value.email) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['email'],
+        message: 'Enter your email so we can send the confirmation code',
+      });
+    }
+  });
 
 export const otpVerifySchema = z.object({
   requestId: uuidSchema,

@@ -72,6 +72,7 @@ model User {
   assignedCallbacks    CallbackRequest[]           @relation("CallbackAssignee")
   assignedLeads        CoverageLead[]              @relation("LeadAssignee")
   requestedRefunds     Refund[]                    @relation("RefundRequester")
+  invoicesMarkedPaid   Invoice[]                   @relation("InvoiceMarkedPaidBy")
 
   @@index([status])
   @@index([createdAt])
@@ -387,6 +388,19 @@ model CoverageLead {
   @@map("coverage_leads")
 }
 
+/// Demand from outside the current service city, used to plan expansion.
+model CityWaitlist {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  phone     String
+  city      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([city, createdAt])
+  @@index([phone])
+  @@map("city_waitlist")
+}
+
 /* ============================================================================
    Product and plan catalog
    ============================================================================ */
@@ -558,6 +572,7 @@ model Plan {
   subscriptions Subscription[]
   changeRequests SubscriptionChangeRequest[]
   analyticsEvents AnalyticsEvent[]
+  orders        Order[]
 
   @@index([status, featured, displayOrder])
   @@index([kind, status])
@@ -736,6 +751,7 @@ model Customer {
   invoices      Invoice[]
   payments      Payment[]
   tickets       Ticket[]
+  orders        Order[]
 
   @@index([status, createdAt])
   @@index([cityId])
@@ -906,6 +922,7 @@ model Subscription {
   history        SubscriptionHistory[]
   changeRequests SubscriptionChangeRequest[]
   invoices       Invoice[]
+  order          Order?
 
   @@index([customerId, status])
   @@index([status, nextBillingDate])
@@ -974,6 +991,69 @@ model SubscriptionChangeRequest {
 }
 
 /* ============================================================================
+   Orders (login + emailed OTP, no online checkout)
+   ============================================================================ */
+
+enum OrderStatus {
+  PENDING_OTP
+  CONFIRMED
+  EXPIRED
+  CANCELLED
+  SCHEDULED
+  INSTALLED
+}
+
+enum NotifyStatus {
+  SENT
+  FAILED
+}
+
+model Order {
+  id             String      @id @default(uuid()) @db.Uuid
+  customerId     String      @map("customer_id") @db.Uuid
+  planId         String      @map("plan_id") @db.Uuid
+  installAddress String      @map("install_address")
+  status         OrderStatus @default(PENDING_OTP)
+  /// SHA-256 of the 6-digit code. Never stored or returned in plaintext.
+  otpCodeHash    String?     @map("otp_code_hash")
+  otpExpiresAt   DateTime?   @map("otp_expires_at")
+  otpAttempts    Int         @default(0) @map("otp_attempts")
+  confirmedAt    DateTime?   @map("confirmed_at")
+  subscriptionId String?     @unique @map("subscription_id") @db.Uuid
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  customer       Customer          @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  plan           Plan              @relation(fields: [planId], references: [id])
+  subscription   Subscription?     @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  notifications  NotificationLog[]
+
+  @@index([customerId, createdAt])
+  @@index([status, createdAt])
+  @@index([planId])
+  @@map("orders")
+}
+
+model NotificationLog {
+  id             String       @id @default(uuid()) @db.Uuid
+  recipient      String
+  subjectOrTag   String       @map("subject_or_tag")
+  /// Delivery copy only — OTP codes are never written here.
+  body           String
+  relatedOrderId String?      @map("related_order_id") @db.Uuid
+  status         NotifyStatus @default(SENT)
+  error          String?
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  order Order? @relation(fields: [relatedOrderId], references: [id], onDelete: SetNull)
+
+  @@index([relatedOrderId, createdAt])
+  @@index([status, createdAt])
+  @@index([createdAt])
+  @@map("notification_logs")
+}
+
+/* ============================================================================
    Billing
    ============================================================================ */
 
@@ -1016,11 +1096,15 @@ model Invoice {
   currency           String        @default("PKR") @db.Char(3)
   notes              String?
   pdfKey             String?       @map("pdf_key")
+  /// How an admin recorded the settlement: cash | bank_transfer | office.
+  paidMethod         String?       @map("paid_method")
+  paidByAdminId      String?       @map("paid_by_admin_id") @db.Uuid
   createdAt          DateTime      @default(now()) @map("created_at")
   updatedAt          DateTime      @updatedAt @map("updated_at")
 
   customer     Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
   subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  paidByAdmin  User?         @relation("InvoiceMarkedPaidBy", fields: [paidByAdminId], references: [id], onDelete: SetNull)
   items        InvoiceItem[]
   payments     Payment[]
 

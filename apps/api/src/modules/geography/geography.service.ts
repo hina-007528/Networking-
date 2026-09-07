@@ -1,10 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import type { AreaDto, CityDto, SubAreaDto } from '@stormfiber/types';
-import { formatCityHelpline } from '@stormfiber/config';
-import { type PrismaService } from '../../common/prisma/prisma.service';
-import { CacheKeys, type CacheService } from '../../common/cache/cache.service';
+import { formatCityHelpline, isServiceCity } from '@stormfiber/config';
+import type { upsertAreaSchema, upsertCitySchema, upsertSubAreaSchema } from '@stormfiber/validation';
+import type { z } from 'zod';
+import { AuditAction, AuditService } from '../../common/audit/audit.service';
+import { CacheKeys, CacheNamespaces, CacheService } from '../../common/cache/cache.service';
+import type { RequestContext } from '../../common/decorators/auth.decorators';
 import { AppException } from '../../common/errors/app.exception';
+import { PrismaService } from '../../common/prisma/prisma.service';
+import { throwIfUniqueConflict } from '../../common/utils/prisma-errors';
+
+export type UpsertCityPayload = z.output<typeof upsertCitySchema>;
+export type UpsertAreaPayload = z.output<typeof upsertAreaSchema>;
+export type UpsertSubAreaPayload = z.output<typeof upsertSubAreaSchema>;
 
 /** Cities and areas change rarely, so the public read path is cached for an hour. */
 const GEOGRAPHY_TTL_SECONDS = 3600;
@@ -24,6 +33,7 @@ export class GeographyService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cache: CacheService,
+    private readonly audit: AuditService,
   ) {}
 
   async listCities(includeInactive = false): Promise<CityDto[]> {
@@ -38,12 +48,13 @@ export class GeographyService {
 
   private async loadCities(includeInactive: boolean): Promise<CityDto[]> {
     const rows = await this.prisma.city.findMany({
-      where: includeInactive ? {} : { isActive: true, deletedAt: null },
+      where: includeInactive ? { deletedAt: null } : { isActive: true, deletedAt: null },
       include: { _count: { select: { areas: true } } },
       orderBy: [{ displayOrder: 'asc' }, { name: 'asc' }],
     });
 
-    return rows.map((row) => this.toCityDto(row));
+    const visible = includeInactive ? rows : rows.filter((row) => isServiceCity(row.name));
+    return visible.map((row) => this.toCityDto(row));
   }
 
   async getCityBySlug(slug: string): Promise<CityDto> {
@@ -58,9 +69,9 @@ export class GeographyService {
   }
 
   /** Resolves a slug to an id without serialising the whole city. */
-  async requireCityIdBySlug(slug: string): Promise<string> {
+  async requireCityIdBySlug(slug: string, includeInactive = false): Promise<string> {
     const city = await this.prisma.city.findFirst({
-      where: { slug, isActive: true, deletedAt: null },
+      where: { slug, deletedAt: null, ...(includeInactive ? {} : { isActive: true }) },
       select: { id: true },
     });
 
@@ -73,7 +84,7 @@ export class GeographyService {
 
   async listAreasByCitySlug(slug: string, includeInactive = false): Promise<AreaDto[]> {
     if (includeInactive) {
-      const cityId = await this.requireCityIdBySlug(slug);
+      const cityId = await this.requireCityIdBySlug(slug, true);
       return this.loadAreas(cityId, true);
     }
 
@@ -174,5 +185,199 @@ export class GeographyService {
       expectedLiveDate: row.expectedLiveDate?.toISOString() ?? null,
       isActive: row.isActive,
     };
+  }
+
+  async upsertCity(
+    input: UpsertCityPayload,
+    actorId: string,
+    context: RequestContext,
+    id?: string,
+  ): Promise<CityDto> {
+    try {
+      const row = id
+        ? await this.prisma.city.update({
+            where: { id },
+            data: {
+              name: input.name,
+              slug: input.slug,
+              code: input.code,
+              dialCode: input.dialCode,
+              province: input.province,
+              isActive: input.isActive,
+              isLive: input.isLive,
+              latitude: input.latitude ?? null,
+              longitude: input.longitude ?? null,
+              branchAddress: input.branchAddress ?? null,
+              mapUrl: input.mapUrl ?? null,
+              displayOrder: input.displayOrder,
+            },
+            include: { _count: { select: { areas: true } } },
+          })
+        : await this.prisma.city.create({
+            data: {
+              name: input.name,
+              slug: input.slug,
+              code: input.code,
+              dialCode: input.dialCode,
+              province: input.province,
+              isActive: input.isActive,
+              isLive: input.isLive,
+              latitude: input.latitude ?? null,
+              longitude: input.longitude ?? null,
+              branchAddress: input.branchAddress ?? null,
+              mapUrl: input.mapUrl ?? null,
+              displayOrder: input.displayOrder,
+            },
+            include: { _count: { select: { areas: true } } },
+          });
+
+      await this.afterGeoWrite(actorId, context, row.id, 'City', input);
+      return this.toCityDto(row);
+    } catch (error) {
+      throwIfUniqueConflict(error, 'A city with that slug or code already exists');
+    }
+  }
+
+  async archiveArea(id: string, actorId: string, context: RequestContext): Promise<void> {
+    const existing = await this.prisma.area.findFirst({
+      where: { id, deletedAt: null },
+      select: { id: true },
+    });
+    if (!existing) {
+      throw AppException.notFound('Area');
+    }
+    await this.prisma.area.update({
+      where: { id },
+      data: { deletedAt: new Date(), isActive: false },
+    });
+    await this.afterGeoWrite(actorId, context, id, 'Area', { archived: true });
+  }
+
+  async archiveSubArea(id: string, actorId: string, context: RequestContext): Promise<void> {
+    const existing = await this.prisma.subArea.findFirst({
+      where: { id, deletedAt: null },
+      select: { id: true },
+    });
+    if (!existing) {
+      throw AppException.notFound('Sub-area');
+    }
+    await this.prisma.subArea.update({
+      where: { id },
+      data: { deletedAt: new Date(), isActive: false },
+    });
+    await this.afterGeoWrite(actorId, context, id, 'SubArea', { archived: true });
+  }
+
+  async archiveCity(id: string, actorId: string, context: RequestContext): Promise<void> {
+    const existing = await this.prisma.city.findFirst({
+      where: { id, deletedAt: null },
+      select: { id: true },
+    });
+    if (!existing) {
+      throw AppException.notFound('City');
+    }
+
+    await this.prisma.city.update({
+      where: { id },
+      data: { deletedAt: new Date(), isActive: false },
+    });
+    await this.afterGeoWrite(actorId, context, id, 'City', { archived: true });
+  }
+
+  async upsertArea(
+    input: UpsertAreaPayload,
+    actorId: string,
+    context: RequestContext,
+    id?: string,
+  ): Promise<AreaDto> {
+    try {
+      const row = id
+        ? await this.prisma.area.update({
+            where: { id },
+            data: {
+              cityId: input.cityId,
+              name: input.name,
+              slug: input.slug,
+              coverageStatus: input.coverageStatus,
+              expectedLiveDate: input.expectedLiveDate ?? null,
+              isActive: input.isActive,
+              displayOrder: input.displayOrder,
+            },
+            include: { _count: { select: { subAreas: true } } },
+          })
+        : await this.prisma.area.create({
+            data: {
+              cityId: input.cityId,
+              name: input.name,
+              slug: input.slug,
+              coverageStatus: input.coverageStatus,
+              expectedLiveDate: input.expectedLiveDate ?? null,
+              isActive: input.isActive,
+              displayOrder: input.displayOrder,
+            },
+            include: { _count: { select: { subAreas: true } } },
+          });
+
+      await this.afterGeoWrite(actorId, context, row.id, 'Area', input);
+      return this.toAreaDto(row);
+    } catch (error) {
+      throwIfUniqueConflict(error, 'An area with that slug already exists in this city');
+    }
+  }
+
+  async upsertSubArea(
+    input: UpsertSubAreaPayload,
+    actorId: string,
+    context: RequestContext,
+    id?: string,
+  ): Promise<SubAreaDto> {
+    try {
+      const row = id
+        ? await this.prisma.subArea.update({
+            where: { id },
+            data: {
+              areaId: input.areaId,
+              name: input.name,
+              slug: input.slug,
+              coverageStatus: input.coverageStatus,
+              expectedLiveDate: input.expectedLiveDate ?? null,
+              isActive: input.isActive,
+            },
+          })
+        : await this.prisma.subArea.create({
+            data: {
+              areaId: input.areaId,
+              name: input.name,
+              slug: input.slug,
+              coverageStatus: input.coverageStatus,
+              expectedLiveDate: input.expectedLiveDate ?? null,
+              isActive: input.isActive,
+            },
+          });
+
+      await this.afterGeoWrite(actorId, context, row.id, 'SubArea', input);
+      return this.toSubAreaDto(row);
+    } catch (error) {
+      throwIfUniqueConflict(error, 'A sub-area with that slug already exists in this area');
+    }
+  }
+
+  private async afterGeoWrite(
+    actorId: string,
+    context: RequestContext,
+    entityId: string,
+    entity: string,
+    newValue: unknown,
+  ): Promise<void> {
+    await this.cache.invalidateNamespace(CacheNamespaces.catalog);
+    await this.cache.invalidateNamespace(CacheNamespaces.coverage);
+    await this.audit.record({
+      userId: actorId,
+      action: AuditAction.COVERAGE_UPDATED,
+      entity,
+      entityId,
+      newValue,
+      context,
+    });
   }
 }

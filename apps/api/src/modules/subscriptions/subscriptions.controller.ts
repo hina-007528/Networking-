@@ -10,7 +10,7 @@ import { Ctx, CurrentCustomerId, type RequestContext } from '../../common/decora
 import { ResponseMessage } from '../../common/decorators/response.decorators';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { ApiZodBody } from '../../common/swagger/zod-swagger';
-import { type ChangeRequestPayload, type SubscriptionsService } from './subscriptions.service';
+import { type ChangeRequestPayload, SubscriptionsService } from './subscriptions.service';
 
 /**
  * The signed-in customer's subscription.
@@ -28,6 +28,12 @@ export class SubscriptionsController {
   @ApiOperation({ summary: 'The customer’s current subscription, or null before activation' })
   current(@CurrentCustomerId() customerId: string): Promise<SubscriptionDto | null> {
     return this.subscriptions.findForCustomer(customerId);
+  }
+
+  @Get('all')
+  @ApiOperation({ summary: 'Every subscription on this account — same rows staff edit' })
+  list(@CurrentCustomerId() customerId: string): Promise<SubscriptionDto[]> {
+    return this.subscriptions.listForCustomer(customerId);
   }
 
   @Get('history')

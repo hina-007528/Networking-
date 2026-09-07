@@ -1,22 +1,34 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ApplicationStatus, type Prisma } from '@prisma/client';
-import type { ApplicationDto, ApplicationStatusHistoryDto, PriceQuoteDto } from '@stormfiber/types';
+import { isServiceCity, SERVICE_CITY } from '@stormfiber/config';
+import type {
+  ApplicationDto,
+  ApplicationStatusHistoryDto,
+  Paginated,
+  PriceQuoteDto,
+} from '@stormfiber/types';
 import { NotificationChannel, NotificationEvent } from '@stormfiber/types';
-import type { createApplicationSchema, updateApplicationStatusSchema } from '@stormfiber/validation';
+import type {
+  adminApplicationListQuerySchema,
+  createApplicationSchema,
+  updateApplicationStatusSchema,
+} from '@stormfiber/validation';
 import type { z } from 'zod';
-import { AuditAction, type AuditService } from '../../common/audit/audit.service';
+import { AuditAction, AuditService } from '../../common/audit/audit.service';
 import type { RequestContext } from '../../common/decorators/auth.decorators';
 import { AppException } from '../../common/errors/app.exception';
-import { type PrismaService } from '../../common/prisma/prisma.service';
+import { PrismaService } from '../../common/prisma/prisma.service';
+import { buildOrderBy, buildPaginationMeta, toPrismaPagination } from '../../common/utils/pagination';
 import { applicationReference } from '../../common/utils/references';
-import { type PricingService } from '../catalog/pricing.service';
-import { type NotificationsService } from '../notifications/notifications.service';
-import { type OtpService } from '../auth/otp.service';
-import { type SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { PricingService } from '../catalog/pricing.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { OtpService } from '../auth/otp.service';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { assertTransition } from './application-state-machine';
 
 export type CreateApplicationPayload = z.output<typeof createApplicationSchema>;
 export type UpdateApplicationStatusPayload = z.output<typeof updateApplicationStatusSchema>;
+export type AdminApplicationListQuery = z.output<typeof adminApplicationListQuerySchema>;
 
 const applicationInclude = {
   city: { select: { name: true } },
@@ -150,6 +162,18 @@ export class ApplicationsService {
    * coverage checker means a caller cannot skip the checker and apply anyway.
    */
   private async assertLocationIsServiceable(input: CreateApplicationPayload): Promise<void> {
+    const city = await this.prisma.city.findFirst({
+      where: { id: input.cityId, deletedAt: null },
+      select: { name: true },
+    });
+    if (!city || !isServiceCity(city.name)) {
+      throw AppException.of(
+        'OUTSIDE_SERVICE_CITY',
+        `New connections are only booked inside ${SERVICE_CITY}.`,
+        422,
+      );
+    }
+
     const zones = await this.prisma.coverageZone.findMany({
       where: {
         cityId: input.cityId,
@@ -175,6 +199,51 @@ export class ApplicationsService {
         409,
       );
     }
+  }
+
+  async list(query: AdminApplicationListQuery): Promise<Paginated<ApplicationDto>> {
+    const { skip, take } = toPrismaPagination(query);
+    const search = query.search?.trim();
+    const where: Prisma.ApplicationWhereInput = {
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.cityId ? { cityId: query.cityId } : {}),
+      ...(query.planId ? { planId: query.planId } : {}),
+      ...(query.from || query.to
+        ? {
+            createdAt: {
+              ...(query.from ? { gte: query.from } : {}),
+              ...(query.to ? { lte: query.to } : {}),
+            },
+          }
+        : {}),
+      ...(search
+        ? {
+            OR: [
+              { reference: { contains: search, mode: 'insensitive' } },
+              { firstName: { contains: search, mode: 'insensitive' } },
+              { lastName: { contains: search, mode: 'insensitive' } },
+              { email: { contains: search, mode: 'insensitive' } },
+              { mobile: { contains: search } },
+            ],
+          }
+        : {}),
+    };
+
+    const [rows, total] = await this.prisma.$transaction([
+      this.prisma.application.findMany({
+        where,
+        include: applicationInclude,
+        orderBy: buildOrderBy(query.sort, query.order, ['createdAt', 'updatedAt', 'submittedAt'], 'createdAt'),
+        skip,
+        take,
+      }),
+      this.prisma.application.count({ where }),
+    ]);
+
+    return {
+      items: rows.map((row) => this.toDto(row)),
+      pagination: buildPaginationMeta(query, total),
+    };
   }
 
   async findById(id: string): Promise<ApplicationDto> {

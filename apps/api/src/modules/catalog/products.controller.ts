@@ -4,7 +4,7 @@ import type { ProductDto } from '@stormfiber/types';
 import { slugParamSchema } from '@stormfiber/validation';
 import { Public } from '../../common/decorators/auth.decorators';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
-import { type ProductsService } from './products.service';
+import { ProductsService } from './products.service';
 
 @ApiTags('Products')
 @Controller('products')

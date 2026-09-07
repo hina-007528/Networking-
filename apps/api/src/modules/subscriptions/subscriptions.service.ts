@@ -7,6 +7,7 @@ import {
 } from '@prisma/client';
 import { billingPolicy, serviceLabels } from '@stormfiber/config';
 import type {
+  Paginated,
   SubscriptionChangeRequestDto,
   SubscriptionDto,
   SubscriptionHistoryDto,
@@ -14,22 +15,25 @@ import type {
 } from '@stormfiber/types';
 import { NotificationChannel, NotificationEvent } from '@stormfiber/types';
 import type {
+  adminSubscriptionListQuerySchema,
   reviewChangeRequestSchema,
   subscriptionChangeRequestSchema,
 } from '@stormfiber/validation';
 import type { z } from 'zod';
-import { AuditAction, type AuditService } from '../../common/audit/audit.service';
+import { AuditAction, AuditService } from '../../common/audit/audit.service';
 import type { RequestContext } from '../../common/decorators/auth.decorators';
 import { AppException } from '../../common/errors/app.exception';
-import { type PrismaService } from '../../common/prisma/prisma.service';
+import { PrismaService } from '../../common/prisma/prisma.service';
 import { money, toNumber } from '../../common/utils/money';
+import { buildPaginationMeta, toPrismaPagination } from '../../common/utils/pagination';
 import { subscriptionReference } from '../../common/utils/references';
-import { type PricingService } from '../catalog/pricing.service';
-import { type CustomersService } from '../customers/customers.service';
-import { type NotificationsService } from '../notifications/notifications.service';
+import { PricingService } from '../catalog/pricing.service';
+import { CustomersService } from '../customers/customers.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 export type ChangeRequestPayload = z.output<typeof subscriptionChangeRequestSchema>;
 export type ReviewChangeRequestPayload = z.output<typeof reviewChangeRequestSchema>;
+export type AdminSubscriptionListQuery = z.output<typeof adminSubscriptionListQuerySchema>;
 
 export const subscriptionInclude = {
   plan: { select: { id: true, name: true, speedMbps: true } },
@@ -396,6 +400,51 @@ export class SubscriptionsService {
     return this.toDto(updated);
   }
 
+  async listForAdmin(query: AdminSubscriptionListQuery): Promise<Paginated<SubscriptionDto>> {
+    const { skip, take } = toPrismaPagination(query);
+    const search = query.search?.trim();
+    const where: Prisma.SubscriptionWhereInput = {
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.cityId ? { cityId: query.cityId } : {}),
+      ...(query.planId ? { planId: query.planId } : {}),
+      ...(search
+        ? {
+            OR: [
+              { reference: { contains: search, mode: 'insensitive' } },
+              { customer: { accountNumber: { contains: search } } },
+              { customer: { firstName: { contains: search, mode: 'insensitive' } } },
+              { customer: { lastName: { contains: search, mode: 'insensitive' } } },
+            ],
+          }
+        : {}),
+    };
+
+    const [rows, total] = await this.prisma.$transaction([
+      this.prisma.subscription.findMany({
+        where,
+        include: {
+          ...subscriptionInclude,
+          customer: { select: { firstName: true, lastName: true, accountNumber: true } },
+          city: { select: { name: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take,
+      }),
+      this.prisma.subscription.count({ where }),
+    ]);
+
+    return {
+      items: rows.map((row) => ({
+        ...this.toDto(row),
+        customerName: `${row.customer.firstName} ${row.customer.lastName}`,
+        customerAccountNumber: row.customer.accountNumber,
+        cityName: row.city.name,
+      })),
+      pagination: buildPaginationMeta(query, total),
+    };
+  }
+
   async findById(id: string): Promise<SubscriptionDto> {
     const row = await this.prisma.subscription.findUnique({
       where: { id },
@@ -407,6 +456,60 @@ export class SubscriptionsService {
     }
 
     return this.toDto(row);
+  }
+
+  async findByIdForAdmin(id: string): Promise<SubscriptionDto> {
+    const row = await this.prisma.subscription.findUnique({
+      where: { id },
+      include: {
+        ...subscriptionInclude,
+        customer: { select: { firstName: true, lastName: true, accountNumber: true } },
+        city: { select: { name: true } },
+      },
+    });
+
+    if (!row) {
+      throw AppException.notFound('Subscription');
+    }
+
+    return {
+      ...this.toDto(row),
+      customerName: `${row.customer.firstName} ${row.customer.lastName}`,
+      customerAccountNumber: row.customer.accountNumber,
+      cityName: row.city.name,
+    };
+  }
+
+  async listChangeRequestsForAdmin(): Promise<SubscriptionChangeRequestDto[]> {
+    const rows = await this.prisma.subscriptionChangeRequest.findMany({
+      include: {
+        ...changeRequestInclude,
+        subscription: {
+          select: {
+            reference: true,
+            customer: { select: { firstName: true, lastName: true } },
+          },
+        },
+      },
+      orderBy: [{ createdAt: 'desc' }],
+      take: 80,
+    });
+
+    return rows.map((row) => ({
+      ...this.toChangeRequestDto(row),
+      customerName: `${row.subscription.customer.firstName} ${row.subscription.customer.lastName}`,
+      subscriptionReference: row.subscription.reference,
+    }));
+  }
+
+  async listChangeRequestsForSubscription(subscriptionId: string): Promise<SubscriptionChangeRequestDto[]> {
+    const rows = await this.prisma.subscriptionChangeRequest.findMany({
+      where: { subscriptionId },
+      include: changeRequestInclude,
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return rows.map((row) => this.toChangeRequestDto(row));
   }
 
   /** The customer's live subscription, or null while their application is still in flight. */
@@ -889,6 +992,225 @@ export class SubscriptionsService {
         scheduledFor: request.effectiveFrom ?? undefined,
       },
     });
+  }
+
+  /**
+   * Creates a pending-install subscription when a customer confirms an order via OTP.
+   * Uses the same Subscription row the customer dashboard reads.
+   */
+  async createFromOrder(input: {
+    customerId: string;
+    planId: string;
+    cityId: string;
+    reason: string;
+  }): Promise<SubscriptionDto> {
+    const quote = await this.pricing.quote({
+      planId: input.planId,
+      cityId: input.cityId,
+      addonIds: [],
+      includeInstallation: false,
+    });
+
+    const plan = await this.prisma.plan.findUniqueOrThrow({
+      where: { id: input.planId },
+      select: { name: true, services: true },
+    });
+
+    const created = await this.prisma.$transaction(async (tx) => {
+      const subscription = await tx.subscription.create({
+        data: {
+          reference: subscriptionReference(),
+          customerId: input.customerId,
+          planId: input.planId,
+          cityId: input.cityId,
+          status: SubscriptionStatus.PENDING,
+          services: plan.services,
+          monthlyAmount: money(quote.monthlyTotal),
+          currency: quote.currency,
+          items: {
+            create: this.buildItems({
+              planName: plan.name,
+              services: plan.services,
+              basePrice: quote.basePrice,
+              currency: quote.currency,
+              addons: [],
+            }),
+          },
+        },
+        include: subscriptionInclude,
+      });
+
+      await tx.subscriptionHistory.create({
+        data: {
+          subscriptionId: subscription.id,
+          changeType: SubscriptionChangeType.SERVICE_ACTIVATED,
+          toValue: plan.name,
+          reason: input.reason,
+        },
+      });
+
+      return subscription;
+    });
+
+    return this.toDto(created);
+  }
+
+  async listForCustomer(customerId: string): Promise<SubscriptionDto[]> {
+    const rows = await this.prisma.subscription.findMany({
+      where: { customerId },
+      include: subscriptionInclude,
+      orderBy: { createdAt: 'desc' },
+    });
+    return rows.map((row) => this.toDto(row));
+  }
+
+  async adminUpdateForCustomer(
+    customerId: string,
+    input: {
+      subscriptionId: string;
+      planId?: string;
+      status?: SubscriptionStatus;
+      startedAt?: Date | null;
+      currentPeriodStart?: Date | null;
+      currentPeriodEnd?: Date | null;
+      nextBillingDate?: Date | null;
+      reason?: string;
+    },
+    actorId: string,
+    context: RequestContext,
+  ): Promise<SubscriptionDto> {
+    const existing = await this.prisma.subscription.findFirst({
+      where: { id: input.subscriptionId, customerId },
+      include: subscriptionInclude,
+    });
+
+    if (!existing) {
+      throw AppException.notFound('Subscription');
+    }
+
+    let monthlyAmount = existing.monthlyAmount;
+    let services = existing.services;
+    let planName = existing.plan.name;
+
+    if (input.planId && input.planId !== existing.planId) {
+      const quote = await this.pricing.quote({
+        planId: input.planId,
+        cityId: existing.cityId,
+        addonIds: [],
+        includeInstallation: false,
+      });
+      const plan = await this.prisma.plan.findFirst({
+        where: { id: input.planId, deletedAt: null },
+        select: { name: true, services: true },
+      });
+      if (!plan) {
+        throw AppException.notFound('Plan');
+      }
+      monthlyAmount = money(quote.monthlyTotal);
+      services = plan.services;
+      planName = plan.name;
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.subscription.update({
+        where: { id: existing.id },
+        data: {
+          ...(input.planId ? { planId: input.planId, monthlyAmount, services } : {}),
+          ...(input.status
+            ? {
+                status: input.status,
+                suspendedAt: input.status === SubscriptionStatus.SUSPENDED ? new Date() : existing.suspendedAt,
+                cancelledAt: input.status === SubscriptionStatus.CANCELLED ? new Date() : existing.cancelledAt,
+              }
+            : {}),
+          ...(input.startedAt !== undefined ? { startedAt: input.startedAt } : {}),
+          ...(input.currentPeriodStart !== undefined ? { currentPeriodStart: input.currentPeriodStart } : {}),
+          ...(input.currentPeriodEnd !== undefined ? { currentPeriodEnd: input.currentPeriodEnd } : {}),
+          ...(input.nextBillingDate !== undefined ? { nextBillingDate: input.nextBillingDate } : {}),
+        },
+        include: subscriptionInclude,
+      });
+
+      await tx.subscriptionHistory.create({
+        data: {
+          subscriptionId: row.id,
+          changeType:
+            input.status === SubscriptionStatus.CANCELLED
+              ? SubscriptionChangeType.CANCELLED
+              : input.status === SubscriptionStatus.SUSPENDED
+                ? SubscriptionChangeType.SERVICE_SUSPENDED
+                : input.planId
+                  ? SubscriptionChangeType.UPGRADE
+                  : SubscriptionChangeType.REACTIVATED,
+          fromValue: `${existing.plan.name} / ${existing.status}`,
+          toValue: `${planName} / ${row.status}`,
+          reason: input.reason ?? 'Updated by staff',
+          changedById: actorId,
+        },
+      });
+
+      return row;
+    });
+
+    await this.audit.record({
+      userId: actorId,
+      action: AuditAction.SUBSCRIPTION_CHANGED,
+      entity: 'Customer',
+      entityId: customerId,
+      oldValue: { subscriptionId: existing.id, planId: existing.planId, status: existing.status },
+      newValue: { subscriptionId: updated.id, planId: updated.planId, status: updated.status },
+      context,
+    });
+
+    return this.toDto(updated);
+  }
+
+  async adminCreateForCustomer(
+    customerId: string,
+    input: { planId: string; status?: SubscriptionStatus; startedAt?: Date; reason?: string },
+    actorId: string,
+    context: RequestContext,
+  ): Promise<SubscriptionDto> {
+    const customer = await this.prisma.customer.findUnique({
+      where: { id: customerId },
+      select: { id: true, cityId: true },
+    });
+
+    if (!customer) {
+      throw AppException.notFound('Customer');
+    }
+
+    const created = await this.createFromOrder({
+      customerId,
+      planId: input.planId,
+      cityId: customer.cityId,
+      reason: input.reason ?? 'Added by staff',
+    });
+
+    if (input.status && input.status !== SubscriptionStatus.PENDING) {
+      return this.adminUpdateForCustomer(
+        customerId,
+        {
+          subscriptionId: created.id,
+          status: input.status,
+          startedAt: input.startedAt ?? null,
+          reason: input.reason,
+        },
+        actorId,
+        context,
+      );
+    }
+
+    await this.audit.record({
+      userId: actorId,
+      action: AuditAction.SUBSCRIPTION_CHANGED,
+      entity: 'Customer',
+      entityId: customerId,
+      newValue: { action: 'created subscription', subscriptionId: created.id, planId: input.planId },
+      context,
+    });
+
+    return created;
   }
 
   /** Billing runs on calendar months, which is what the published policy promises. */

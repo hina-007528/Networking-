@@ -1,64 +1,69 @@
 /**
- * Brand-level copy defaults.
- *
- * Anything an operator would realistically want to change lives in the CMS (`site_settings`).
- * These values are only the fallbacks used before the CMS responds, or during static rendering of
- * error pages where an API round-trip is not possible.
+ * Brand-level copy defaults for Majawar X Network.
+ * CMS site_settings can override display values at runtime.
  */
 export const brand = {
-  name: 'StormFiber',
-  legalName: 'StormFiber Communications (Pvt) Ltd',
-  tagline: '100% fibre to the home',
+  name: 'Majawar X Network',
+  shortName: 'Majawar X',
+  legalName: 'Majawar X Networks',
+  tagline: 'Built for Speed – Made for You.',
   description:
-    'Ultra-fast fibre internet, high-definition television and crystal clear voice on a single fibre line.',
-  supportPhoneDisplay: '111-1-78676',
-  supportPhoneE164: '+92211111 78676',
-  supportEmail: 'help@stormfiber.local',
-  salesEmail: 'sales@stormfiber.local',
+    "Lahore's fibre network — high-speed internet, HD television and home voice, proudly serving Lahore.",
+  supportPhoneDisplay: '0303 0002291',
+  supportPhoneE164: '+923030002291',
+  whatsappDisplay: '+92 325 7862291',
+  whatsappE164: '+923257862291',
+  whatsappUrl: 'https://wa.me/923257862291',
+  officeEmail: 'infomajawarxnetworks@gmail.com',
+  supportEmail: 'info@majawarxnetworks.online',
+  salesEmail: 'ceo@majawarxnetworks.online',
+  adminEmails: ['ceo@majawarxnetworks.online', 'info@majawarxnetworks.online'] as const,
+  website: 'https://www.majawarxnetworks.online',
   currency: 'PKR',
   currencySymbol: 'Rs',
   locale: 'en-PK',
   timeZone: 'Asia/Karachi',
+  offices: {
+    head: {
+      label: 'Head Office',
+      address: 'H#A/1, Sheikh Hindi Manzil, Outside Bhatti Gate, Lahore.',
+    },
+    branch: {
+      label: 'Branch Office',
+      address: 'Chohan Tower, 16 Jail Rd, Shadman II, Shadman 2, Shadman, Lahore, 54000.',
+    },
+  },
   social: [
-    { platform: 'facebook', url: 'https://example.com/stormfiber' },
-    { platform: 'instagram', url: 'https://example.com/stormfiber' },
-    { platform: 'x', url: 'https://example.com/stormfiber' },
-    { platform: 'linkedin', url: 'https://example.com/stormfiber' },
-    { platform: 'youtube', url: 'https://example.com/stormfiber' },
+    { platform: 'whatsapp', url: 'https://wa.me/923257862291' },
+    { platform: 'instagram', url: 'https://www.instagram.com/majawar_x_network?igsi=bDVhMmF1bmpkOGdo' },
+    { platform: 'linkedin', url: 'https://www.linkedin.com/company/majawar-x-networks/' },
   ],
 } as const;
 
-/** Billing rules that are visible to customers and therefore part of the product contract. */
 export const billingPolicy = {
-  /** Invoices are generated on this day of the month. */
   generationDayOfMonth: 1,
-  /** Invoices are payable by this day of the same month. */
   dueDayOfMonth: 10,
-  /** Grace period, in days after the due date, before an invoice is marked overdue. */
   overdueGraceDays: 0,
-  /** Days after the due date at which service suspension is considered. */
   suspensionAfterDays: 20,
   lateFeePercentage: 0,
   advancePaymentDiscountPercentage: 5,
 } as const;
 
 export const seo = {
-  titleTemplate: '%s | StormFiber',
-  defaultTitle: 'StormFiber — Ultra-Fast Fibre Internet, HD TV and Voice',
+  titleTemplate: '%s | Majawar X Network',
+  defaultTitle: "Majawar X Network — Lahore's fiber network",
   defaultDescription:
-    'Get ultra-fast 100% fibre-optic internet, HD television and crystal clear voice on a single connection. Check coverage in your area and pick a plan built for your home.',
+    "Proudly serving Lahore with fibre internet, HD TV and voice. Check coverage, pick a plan, and manage your account.",
   keywords: [
-    'fibre internet',
-    'fiber internet Pakistan',
+    'Majawar X Network',
+    'fibre internet Lahore',
     'FTTH broadband',
     'HD TV',
-    'landline voice',
-    'triple play',
-    'double play',
-    'internet packages',
+    'home phone',
+    'internet packages Lahore',
   ],
-  ogImagePath: '/og/default.png',
-  twitterHandle: '@stormfiber',
+  ogImagePath: '/brand/logo.svg',
+  twitterHandle: '@majawar_x_network',
 } as const;
 
 export const preferredTimeOptions = [

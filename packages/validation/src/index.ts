@@ -7,5 +7,6 @@ export * from './applications';
 export * from './customers';
 export * from './support';
 export * from './billing';
+export * from './orders';
 export * from './cms';
 export * from './admin';

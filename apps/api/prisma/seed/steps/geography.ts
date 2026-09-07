@@ -1,4 +1,5 @@
 import { CoverageStatus, type PrismaClient } from '@prisma/client';
+import { isServiceCity } from '@stormfiber/config';
 import { seedCities } from '../data/geography';
 import { dateOnly, logStep, slugify } from '../utils';
 
@@ -65,7 +66,7 @@ export async function seedGeography(prisma: PrismaClient): Promise<SeededGeograp
         code: cityData.code,
         dialCode: cityData.dialCode,
         province: cityData.province,
-        isLive: cityData.isLive,
+        isLive: isServiceCity(cityData.name),
         latitude: cityData.latitude ?? null,
         longitude: cityData.longitude ?? null,
         branchAddress: cityData.branchAddress ?? null,
@@ -78,7 +79,7 @@ export async function seedGeography(prisma: PrismaClient): Promise<SeededGeograp
         dialCode: cityData.dialCode,
         province: cityData.province,
         isActive: true,
-        isLive: cityData.isLive,
+        isLive: isServiceCity(cityData.name),
         latitude: cityData.latitude ?? null,
         longitude: cityData.longitude ?? null,
         branchAddress: cityData.branchAddress ?? null,

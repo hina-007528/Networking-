@@ -3,10 +3,14 @@
   "version": "1.0.0",
   "private": true,
   "description": "Production-grade ISP platform: public website, customer portal, admin console and API",
-  "packageManager": "pnpm@9.15.9",
   "engines": {
     "node": ">=20.11.0"
   },
+  "packageManager": "npm@10.8.2",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
@@ -28,6 +32,7 @@
     "docker:prod": "docker compose up -d --build"
   },
   "dependencies": {
+    "pnpm": "^12.3.4",
     "zod": "3.24.1"
   },
   "devDependencies": {

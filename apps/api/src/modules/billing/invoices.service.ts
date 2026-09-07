@@ -1,5 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { InvoiceItemType, InvoiceStatus, type Prisma, SubscriptionStatus } from '@prisma/client';
+import {
+  InvoiceItemType,
+  InvoiceStatus,
+  PaymentMethod,
+  PaymentStatus,
+  type Prisma,
+  SubscriptionStatus,
+} from '@prisma/client';
 import { billingPolicy } from '@stormfiber/config';
 import type {
   InvoiceDto,
@@ -9,19 +16,22 @@ import type {
   PriceQuoteDto,
 } from '@stormfiber/types';
 import { NotificationChannel, NotificationEvent } from '@stormfiber/types';
-import type { PaginationQuery } from '@stormfiber/validation';
-import { AuditAction, type AuditService } from '../../common/audit/audit.service';
+import type { adminInvoiceListQuerySchema, PaginationQuery } from '@stormfiber/validation';
+import type { z } from 'zod';
+import { AuditAction, AuditService } from '../../common/audit/audit.service';
 import { AppException } from '../../common/errors/app.exception';
-import { type Db, type PrismaService } from '../../common/prisma/prisma.service';
-import { type SequenceService } from '../../common/sequence/sequence.service';
+import { type Db, PrismaService } from '../../common/prisma/prisma.service';
+import { SequenceService } from '../../common/sequence/sequence.service';
 import { buildPaginationMeta, toPrismaPagination } from '../../common/utils/pagination';
 import { money, roundMoney, sum, toNumber, ZERO, type Money } from '../../common/utils/money';
-import { invoiceNumber } from '../../common/utils/references';
-import { type PricingService } from '../catalog/pricing.service';
-import { type NotificationsService } from '../notifications/notifications.service';
+import { invoiceNumber, paymentReference } from '../../common/utils/references';
+import type { RequestContext } from '../../common/decorators/auth.decorators';
+import { PricingService } from '../catalog/pricing.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 export const invoiceInclude = {
   customer: { select: { firstName: true, lastName: true, userId: true } },
+  paidByAdmin: { select: { firstName: true, lastName: true } },
   items: { orderBy: { createdAt: 'asc' } },
 } satisfies Prisma.InvoiceInclude;
 
@@ -35,6 +45,8 @@ export interface GenerateInvoiceInput {
   /** Charged on the first invoice only, once the connection has been installed. */
   includeInstallation?: boolean;
 }
+
+export type AdminInvoiceListQuery = z.output<typeof adminInvoiceListQuerySchema>;
 
 /** Statuses from which an invoice can still be paid. */
 const PAYABLE: InvoiceStatus[] = [
@@ -336,6 +348,37 @@ export class InvoicesService {
   }
 
   /**
+   * Reminds customers whose invoices fall due in the next three days.
+   *
+   * Safe to run daily: an invoice that is already overdue is handled by `markOverdue`, and this
+   * query only covers still-payable bills that have not yet crossed the due date.
+   */
+  async sendReminders(now = new Date()): Promise<{ sent: number }> {
+    const start = this.startOfDay(now);
+    const horizon = new Date(start);
+    horizon.setUTCDate(horizon.getUTCDate() + 3);
+
+    const dueSoon = await this.prisma.invoice.findMany({
+      where: {
+        status: { in: [InvoiceStatus.GENERATED, InvoiceStatus.PENDING, InvoiceStatus.PARTIALLY_PAID] },
+        dueDate: { gte: start, lte: horizon },
+      },
+      include: invoiceInclude,
+      take: 500,
+    });
+
+    for (const invoice of dueSoon) {
+      await this.notifyCustomer(invoice, NotificationEvent.INVOICE_GENERATED);
+    }
+
+    if (dueSoon.length > 0) {
+      this.logger.log(`Sent ${dueSoon.length} invoice reminder(s)`);
+    }
+
+    return { sent: dueSoon.length };
+  }
+
+  /**
    * Applies a settled payment and derives the resulting status.
    *
    * Runs inside the payment's transaction, so an invoice can never be marked paid without the
@@ -486,6 +529,136 @@ export class InvoicesService {
     return this.toDto(row);
   }
 
+  async listForAdmin(query: AdminInvoiceListQuery): Promise<Paginated<InvoiceDto>> {
+    const { skip, take } = toPrismaPagination(query);
+    const search = query.search?.trim();
+    const where: Prisma.InvoiceWhereInput = {
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.customerId ? { customerId: query.customerId } : {}),
+      ...(query.from || query.to
+        ? {
+            createdAt: {
+              ...(query.from ? { gte: query.from } : {}),
+              ...(query.to ? { lte: query.to } : {}),
+            },
+          }
+        : {}),
+      ...(search
+        ? {
+            OR: [
+              { invoiceNumber: { contains: search, mode: 'insensitive' } },
+              { customer: { lastName: { contains: search, mode: 'insensitive' } } },
+            ],
+          }
+        : {}),
+    };
+
+    const [rows, total] = await this.prisma.$transaction([
+      this.prisma.invoice.findMany({
+        where,
+        include: invoiceInclude,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take,
+      }),
+      this.prisma.invoice.count({ where }),
+    ]);
+
+    return {
+      items: rows.map((row) => this.toDto(row)),
+      pagination: buildPaginationMeta(query, total),
+    };
+  }
+
+  async findById(invoiceId: string): Promise<InvoiceDto> {
+    return this.toDto(await this.loadRow(invoiceId));
+  }
+
+  /**
+   * Staff mark an invoice paid after collecting cash, a bank transfer, or office payment.
+   * There is no customer-facing gateway.
+   */
+  async markPaid(
+    invoiceId: string,
+    method: 'cash' | 'bank_transfer' | 'office',
+    actorId: string,
+    context: RequestContext,
+  ): Promise<InvoiceDto> {
+    const invoice = await this.prisma.invoice.findUnique({
+      where: { id: invoiceId },
+      select: {
+        id: true,
+        customerId: true,
+        invoiceNumber: true,
+        currency: true,
+        status: true,
+        total: true,
+        amountPaid: true,
+      },
+    });
+
+    if (!invoice) {
+      throw AppException.notFound('Invoice');
+    }
+
+    if (!PAYABLE.includes(invoice.status)) {
+      throw AppException.conflict(
+        invoice.status === InvoiceStatus.PAID
+          ? 'This invoice is already marked paid'
+          : 'This invoice cannot be marked paid',
+      );
+    }
+
+    const amountDue = roundMoney(money(invoice.total).minus(money(invoice.amountPaid)));
+    if (amountDue.lessThanOrEqualTo(0)) {
+      throw AppException.conflict('There is nothing left to mark paid');
+    }
+
+    const paymentMethod =
+      method === 'bank_transfer' ? PaymentMethod.BANK_TRANSFER : PaymentMethod.CASH;
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.payment.create({
+        data: {
+          reference: paymentReference(),
+          invoiceId: invoice.id,
+          customerId: invoice.customerId,
+          amount: amountDue,
+          currency: invoice.currency,
+          method: paymentMethod,
+          provider: 'offline',
+          status: PaymentStatus.SUCCEEDED,
+          idempotencyKey: `mark-paid:${invoice.id}:${actorId}:${Date.now()}`,
+          paidAt: new Date(),
+          metadata: { markedBy: actorId, method } as Prisma.InputJsonValue,
+        },
+      });
+
+      await this.applyPayment(tx, invoice.id, amountDue);
+
+      await tx.invoice.update({
+        where: { id: invoice.id },
+        data: { paidMethod: method, paidByAdminId: actorId },
+      });
+
+      await tx.customer.update({
+        where: { id: invoice.customerId },
+        data: { balance: { increment: amountDue.negated() } },
+      });
+    });
+
+    await this.audit.record({
+      userId: actorId,
+      action: AuditAction.PAYMENT_RECORDED,
+      entity: 'Invoice',
+      entityId: invoice.id,
+      newValue: { method, invoiceNumber: invoice.invoiceNumber, amount: toNumber(amountDue) },
+      context,
+    });
+
+    return this.findById(invoiceId);
+  }
+
   /** The full row, used by the PDF renderer and the admin module. */
   async loadRow(invoiceId: string, customerId?: string): Promise<InvoiceRow> {
     const row = await this.prisma.invoice.findFirst({
@@ -568,6 +741,11 @@ export class InvoicesService {
       notes: row.notes,
       // Rendered on demand from the stored items, so there is never a stale copy to serve.
       pdfUrl: `/customer/invoices/${row.id}/pdf`,
+      paidMethod: row.paidMethod,
+      paidByAdminId: row.paidByAdminId,
+      paidByAdminName: row.paidByAdmin
+        ? `${row.paidByAdmin.firstName} ${row.paidByAdmin.lastName}`
+        : null,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     };

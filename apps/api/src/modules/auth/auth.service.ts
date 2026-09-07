@@ -16,15 +16,19 @@ import {
   NotificationEvent,
   RoleName as Role,
 } from '@stormfiber/types';
+import { isServiceCity, SERVICE_CITY, SERVICE_CITY_SLUG } from '@stormfiber/config';
 import { APP_CONFIG, type AppConfig } from '../../config/configuration';
-import { type Db, type PrismaService } from '../../common/prisma/prisma.service';
+import { type Db, PrismaService } from '../../common/prisma/prisma.service';
 import { AppException } from '../../common/errors/app.exception';
-import { AuditAction, type AuditService } from '../../common/audit/audit.service';
+import { AuditAction, AuditService } from '../../common/audit/audit.service';
 import type { RequestContext } from '../../common/decorators/auth.decorators';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
-import { type NotificationsService } from '../notifications/notifications.service';
-import { type OtpService } from './otp.service';
-import { type TokensService } from './tokens.service';
+import { SequenceService } from '../../common/sequence/sequence.service';
+import { accountNumber } from '../../common/utils/references';
+import { renderNotification } from '../notifications/notification-templates';
+import { NotificationsService } from '../notifications/notifications.service';
+import { OtpService } from './otp.service';
+import { TokensService } from './tokens.service';
 
 /** Shape returned by every user lookup in this service. */
 const userSelect = {
@@ -56,6 +60,7 @@ export interface RegisterInput {
   mobile: string;
   password: string;
   cityId?: string;
+  cityName?: string;
   acceptedTerms: true;
   verificationToken?: string;
 }
@@ -70,6 +75,7 @@ export class AuthService {
     private readonly otp: OtpService,
     private readonly notifications: NotificationsService,
     private readonly audit: AuditService,
+    private readonly sequence: SequenceService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
@@ -98,6 +104,8 @@ export class AuthService {
     }
 
     // Mobile verification is mandatory: the number is the primary support and billing contact.
+    const serviceCity = await this.requireServiceCity(input.cityId, input.cityName);
+
     if (input.verificationToken) {
       await this.otp.consumeProof(input.verificationToken, input.mobile, 'REGISTRATION');
     } else {
@@ -136,23 +144,144 @@ export class AuthService {
       select: userSelect,
     });
 
+    const next = await this.sequence.next('customer.account_sequence', {
+      start: 1000,
+      description: 'Monotonic counter behind customer account numbers',
+    });
+    const accountNo = accountNumber(next);
+    await this.prisma.customer.create({
+      data: {
+        userId: created.id,
+        accountNumber: accountNo,
+        firstName: created.firstName,
+        lastName: created.lastName,
+        email,
+        mobile: input.mobile,
+        status: 'PROSPECT',
+        cityId: serviceCity.id,
+        addressLine: `${SERVICE_CITY}, Punjab`,
+      },
+    });
+
     await this.audit.record({
       userId: created.id,
       action: AuditAction.USER_CREATED,
       entity: 'User',
       entityId: created.id,
-      newValue: { email, mobile: input.mobile, source: 'self-registration' },
+      newValue: { email, mobile: input.mobile, source: 'self-registration', city: SERVICE_CITY },
       context,
     });
 
-    void this.notifications.dispatch({
+    void this.notifyRegistration({
       userId: created.id,
-      event: NotificationEvent.USER_REGISTERED,
-      channels: [NotificationChannel.EMAIL, NotificationChannel.IN_APP],
-      data: { firstName: created.firstName },
+      firstName: created.firstName,
+      lastName: created.lastName,
+      email,
+      mobile: input.mobile,
+      accountNumber: accountNo,
+      city: serviceCity.name,
     });
 
     return this.startSession(created, context, response);
+  }
+
+  private async notifyRegistration(input: {
+    userId: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    mobile: string;
+    accountNumber: string;
+    city: string;
+  }): Promise<void> {
+    const customerName = `${input.firstName} ${input.lastName}`.trim();
+    const loginUrl = `${this.config.http.corsOrigins.find((origin) => origin.includes(':3000')) ?? 'https://www.majawarxnetworks.online'}/login`;
+
+    const customerMail = renderNotification(NotificationEvent.USER_REGISTERED, {
+      firstName: input.firstName,
+      email: input.email,
+      reference: input.accountNumber,
+      href: loginUrl,
+    });
+
+    try {
+      await this.notifications.sendEmail({
+        to: input.email,
+        subject: customerMail.subject,
+        html: customerMail.html,
+        text: customerMail.text,
+        tag: 'USER_REGISTERED',
+        logBody: `Welcome email sent to ${input.email} for account ${input.accountNumber}.`,
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Welcome email to ${input.email} failed: ${error instanceof Error ? error.message : 'unknown'}`,
+      );
+    }
+
+    const adminMail = renderNotification(NotificationEvent.USER_REGISTERED_ADMIN, {
+      customerName,
+      firstName: input.firstName,
+      email: input.email,
+      phone: input.mobile,
+      reference: input.accountNumber,
+      installAddress: input.city,
+    });
+    const adminLog = `New registration: ${customerName} (${input.email}, ${input.mobile}) account ${input.accountNumber} in ${input.city}.`;
+
+    for (const recipient of this.notifications.adminInboxes) {
+      try {
+        await this.notifications.sendEmail({
+          to: recipient,
+          subject: adminMail.subject,
+          html: adminMail.html,
+          text: adminMail.text,
+          tag: 'USER_REGISTERED_ADMIN',
+          logBody: adminLog,
+        });
+      } catch (error) {
+        this.logger.warn(
+          `Registration alert to ${recipient} failed: ${error instanceof Error ? error.message : 'unknown'}`,
+        );
+      }
+    }
+
+    void this.notifications.dispatch({
+      userId: input.userId,
+      event: NotificationEvent.USER_REGISTERED,
+      channels: [NotificationChannel.IN_APP],
+      data: { firstName: input.firstName, reference: input.accountNumber },
+    });
+  }
+
+  private async requireServiceCity(
+    cityId?: string,
+    cityName?: string,
+  ): Promise<{ id: string; name: string }> {
+    if (cityName && !isServiceCity(cityName)) {
+      throw AppException.of(
+        'OUTSIDE_SERVICE_CITY',
+        `Accounts are only opened for ${SERVICE_CITY} addresses. Join the waitlist if you live elsewhere.`,
+        HttpStatus.UNPROCESSABLE_ENTITY,
+      );
+    }
+
+    const city = cityId
+      ? await this.prisma.city.findFirst({ where: { id: cityId, deletedAt: null }, select: { id: true, name: true } })
+      : await this.prisma.city.findFirst({
+          where: { slug: SERVICE_CITY_SLUG, deletedAt: null },
+          select: { id: true, name: true },
+        });
+
+    if (!city || !isServiceCity(city.name)) {
+      throw AppException.of(
+        'OUTSIDE_SERVICE_CITY',
+        `Accounts are only opened for ${SERVICE_CITY} addresses.`,
+        HttpStatus.UNPROCESSABLE_ENTITY,
+      );
+    }
+
+    return city;
   }
 
   /**
@@ -225,7 +354,7 @@ export class AuthService {
   // ---------------------------------------------------------------------------
 
   async login(
-    input: { identifier: string; password: string },
+    input: { identifier: string; password: string; rememberMe?: boolean },
     context: RequestContext | null,
     response: Response,
   ): Promise<AuthSessionDto> {
@@ -274,7 +403,7 @@ export class AuthService {
       context,
     });
 
-    return this.startSession(user, context, response);
+    return this.startSession(user, context, response, input.rememberMe === true);
   }
 
   /**
@@ -310,12 +439,13 @@ export class AuthService {
     user: UserRecord,
     context: RequestContext | null,
     response: Response,
+    persistent = true,
   ): Promise<AuthSessionDto> {
     const principal = this.toPrincipal(user);
     const { tokens } = await this.tokens.issueSession(principal, context);
 
     if (tokens.refreshToken) {
-      this.tokens.setRefreshCookie(response, tokens.refreshToken);
+      this.tokens.setRefreshCookie(response, tokens.refreshToken, { persistent });
     }
 
     return {

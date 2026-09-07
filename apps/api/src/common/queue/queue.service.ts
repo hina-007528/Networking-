@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
-import { Queue } from 'bullmq';
+import { Queue, Worker } from 'bullmq';
 import Redis from 'ioredis';
 import { APP_CONFIG, type AppConfig } from '../../config/configuration';
 
@@ -34,6 +34,7 @@ export class QueueService implements OnModuleDestroy {
   private readonly logger = new Logger(QueueService.name);
   private readonly queues = new Map<string, Queue>();
   private readonly inlineHandlers = new Map<string, InlineHandler>();
+  private readonly workers: Worker[] = [];
   private connection: Redis | null = null;
 
   constructor(@Inject(APP_CONFIG) private readonly config: AppConfig) {}
@@ -110,8 +111,47 @@ export class QueueService implements OnModuleDestroy {
     return queue;
   }
 
+  /**
+   * Starts BullMQ workers for every queue that registered a handler.
+   *
+   * The API process only produces jobs. A separate `worker` entrypoint calls this so a crash in
+   * invoice generation cannot take the HTTP process down with it.
+   */
+  async startWorkers(): Promise<void> {
+    if (!this.enabled) {
+      this.logger.warn('QUEUE_ENABLED is false — workers will not start');
+      return;
+    }
+
+    for (const [name, handler] of this.inlineHandlers.entries()) {
+      const worker = new Worker(
+        name,
+        async (job) => {
+          await handler(job.name, job.data);
+        },
+        {
+          connection: this.getConnection(),
+          concurrency: name === QueueName.BILLING ? 1 : 4,
+        },
+      );
+
+      worker.on('failed', (job, error) => {
+        this.logger.error(
+          `Job ${job?.name ?? 'unknown'} on ${name} failed: ${error.message}`,
+        );
+      });
+
+      this.workers.push(worker);
+      this.logger.log(`Worker listening on ${name}`);
+    }
+  }
+
   async onModuleDestroy(): Promise<void> {
-    await Promise.all([...this.queues.values()].map((queue) => queue.close().catch(() => undefined)));
+    await Promise.all([
+      ...this.workers.map((worker) => worker.close()),
+      ...[...this.queues.values()].map((queue) => queue.close().catch(() => undefined)),
+    ]);
+    this.workers.length = 0;
     this.queues.clear();
     if (this.connection) {
       this.connection.disconnect();

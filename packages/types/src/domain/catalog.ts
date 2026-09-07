@@ -15,6 +15,7 @@ export interface ProductDto {
   displayOrder: number;
   seoTitle: string | null;
   seoDescription: string | null;
+  status?: PublishStatus;
 }
 
 export interface ProductFeatureDto {
@@ -170,4 +171,29 @@ export interface PriceQuoteRequest {
   addonIds?: string[];
   promotionCode?: string;
   includeInstallation?: boolean;
+}
+
+export interface PlanPriceDto {
+  id: string;
+  planId: string;
+  cityId: string;
+  cityName: string;
+  citySlug: string;
+  monthlyPrice: number;
+  installationPrice: number;
+  currency: string;
+  isActive: boolean;
+}
+
+export interface TaxRuleDto {
+  id: string;
+  code: string;
+  label: string;
+  kind: 'PERCENTAGE' | 'FIXED';
+  rate: number;
+  fixedAmount: number;
+  appliesTo: Array<'SUBSCRIPTION' | 'ADDON' | 'INSTALLATION'>;
+  isActive: boolean;
+  effectiveFrom: string | null;
+  effectiveTo: string | null;
 }

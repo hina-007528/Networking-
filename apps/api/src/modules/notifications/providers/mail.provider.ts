@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { createTransport, type Transporter } from 'nodemailer';
+import { redactSecrets } from '../../../common/utils/otp-hash';
 import { APP_CONFIG, type AppConfig } from '../../../config/configuration';
 
 export interface MailMessage {
@@ -29,7 +30,9 @@ export class ConsoleMailProvider implements MailProvider {
   private readonly logger = new Logger(ConsoleMailProvider.name);
 
   async send(message: MailMessage): Promise<MailDeliveryResult> {
-    this.logger.log(`[email → ${message.to}] ${message.subject}\n${message.text}`);
+    this.logger.log(
+      `[email → ${message.to}] ${redactSecrets(message.subject)}\n${redactSecrets(message.text)}`,
+    );
     return { delivered: true, providerRef: `console-${Date.now()}` };
   }
 }

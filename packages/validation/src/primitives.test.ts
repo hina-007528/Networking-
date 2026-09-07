@@ -89,9 +89,10 @@ describe('coverageCheckSchema', () => {
   const cityId = '11111111-1111-4111-8111-111111111111';
   const areaId = '22222222-2222-4222-8222-222222222222';
 
-  it('requires an area or sub-area', () => {
-    expect(coverageCheckSchema.safeParse({ cityId }).success).toBe(false);
+  it('accepts a city so the API can return a waitlist result', () => {
+    expect(coverageCheckSchema.safeParse({ cityId }).success).toBe(true);
     expect(coverageCheckSchema.safeParse({ cityId, areaId }).success).toBe(true);
+    expect(coverageCheckSchema.safeParse({}).success).toBe(false);
   });
 });
 

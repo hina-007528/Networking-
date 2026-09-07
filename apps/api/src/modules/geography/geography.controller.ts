@@ -4,7 +4,7 @@ import type { AreaDto, CityDto, SubAreaDto } from '@stormfiber/types';
 import { idParamSchema, slugParamSchema } from '@stormfiber/validation';
 import { Public } from '../../common/decorators/auth.decorators';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
-import { type GeographyService } from './geography.service';
+import { GeographyService } from './geography.service';
 
 /**
  * Public geography endpoints backing the city selector and the cascading area pickers.

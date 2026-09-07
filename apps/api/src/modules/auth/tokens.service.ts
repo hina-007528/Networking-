@@ -1,10 +1,10 @@
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
-import { type JwtService } from '@nestjs/jwt';
+import { JwtService } from '@nestjs/jwt';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import type { Response } from 'express';
 import type { AuthTokens } from '@stormfiber/types';
 import { APP_CONFIG, type AppConfig } from '../../config/configuration';
-import { type PrismaService } from '../../common/prisma/prisma.service';
+import { PrismaService } from '../../common/prisma/prisma.service';
 import { AppException } from '../../common/errors/app.exception';
 import type {
   AccessTokenPayload,
@@ -227,14 +227,14 @@ export class TokensService {
    * Stores the refresh token in an HTTP-only cookie so browser clients never expose it to
    * JavaScript, which removes the XSS route to long-lived credentials.
    */
-  setRefreshCookie(response: Response, refreshToken: string): void {
+  setRefreshCookie(response: Response, refreshToken: string, options?: { persistent?: boolean }): void {
     response.cookie(REFRESH_COOKIE_NAME, refreshToken, {
       httpOnly: true,
       secure: this.config.auth.cookieSecure,
       sameSite: 'lax',
       domain: this.config.auth.cookieDomain === 'localhost' ? undefined : this.config.auth.cookieDomain,
       path: '/',
-      maxAge: this.config.auth.refreshTtl * 1000,
+      ...(options?.persistent === false ? {} : { maxAge: this.config.auth.refreshTtl * 1000 }),
     });
   }
 

@@ -196,6 +196,10 @@ export const analyticsEventSchema = z.object({
   properties: z.record(z.unknown()).default({}),
 });
 
+export const uploadMetaSchema = z.object({
+  altText: z.string().trim().max(160).optional(),
+});
+
 export type UpsertHeroSlideInput = z.input<typeof upsertHeroSlideSchema>;
 export type UpsertCmsPageInput = z.input<typeof upsertCmsPageSchema>;
 export type UpsertCityInput = z.input<typeof upsertCitySchema>;

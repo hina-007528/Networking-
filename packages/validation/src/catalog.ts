@@ -44,7 +44,15 @@ export const priceQuoteSchema = z.object({
 });
 
 export const planCompareSchema = z.object({
-  planIds: z.array(uuidSchema).min(2, 'Select at least two plans').max(4, 'Compare up to 4 plans'),
+  planIds: z.preprocess((value) => {
+    if (typeof value === 'string') {
+      return value
+        .split(',')
+        .map((entry) => entry.trim())
+        .filter(Boolean);
+    }
+    return value;
+  }, z.array(uuidSchema).min(2, 'Select at least two plans').max(4, 'Compare up to 4 plans')),
   cityId: uuidSchema.optional(),
 });
 
@@ -161,7 +169,34 @@ export const upsertCityTaxRuleSchema = z.object({
   isActive: z.boolean().default(true),
 });
 
+export const upsertProductFeatureSchema = z.object({
+  title: z.string().trim().min(2).max(120),
+  description: z.string().trim().min(4).max(500),
+  iconKey: z.string().trim().max(60).optional(),
+  imageUrl: z.string().trim().max(600).optional(),
+  displayOrder: z.coerce.number().int().min(0).default(0),
+});
+
+export const upsertProductSchema = z.object({
+  name: z.string().trim().min(2).max(120),
+  slug: slugSchema,
+  serviceType: serviceTypeSchema,
+  categoryId: uuidSchema.optional(),
+  tagline: z.string().trim().min(4).max(160),
+  description: z.string().trim().min(10).max(4000),
+  heroHeadline: z.string().trim().min(4).max(160),
+  heroSubheadline: z.string().trim().max(240).optional(),
+  imageUrl: z.string().trim().max(600).optional(),
+  iconKey: z.string().trim().max(60).optional(),
+  status: publishStatusSchema.default('DRAFT'),
+  displayOrder: z.coerce.number().int().min(0).default(0),
+  seoTitle: z.string().trim().max(70).optional(),
+  seoDescription: z.string().trim().max(180).optional(),
+  features: z.array(upsertProductFeatureSchema).max(20).default([]),
+});
+
 export type PlanFilterInput = z.input<typeof planFilterSchema>;
 export type PriceQuoteInput = z.input<typeof priceQuoteSchema>;
 export type UpsertPlanInput = z.input<typeof upsertPlanSchema>;
 export type UpsertPromotionInput = z.input<typeof upsertPromotionSchema>;
+export type UpsertProductInput = z.input<typeof upsertProductSchema>;

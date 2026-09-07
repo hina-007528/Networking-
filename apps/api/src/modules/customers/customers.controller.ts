@@ -6,7 +6,7 @@ import { Ctx, CurrentCustomerId, type RequestContext } from '../../common/decora
 import { ResponseMessage } from '../../common/decorators/response.decorators';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { ApiZodBody } from '../../common/swagger/zod-swagger';
-import { type CustomersService, type UpdateOwnProfilePayload } from './customers.service';
+import { CustomersService, type UpdateOwnProfilePayload } from './customers.service';
 
 /**
  * The signed-in customer's own record.

@@ -33,16 +33,20 @@ async function main(): Promise<void> {
   console.log('\nSupport');
   const support = await seedSupport(prisma);
 
-  console.log('\nDemo account and activity');
-  await seedDemoData(prisma, {
-    cityIdBySlug: geography.cityIdBySlug,
-    areaIdByKey: geography.areaIdByKey,
-    subAreaIdByKey: geography.subAreaIdByKey,
-    planIdBySlug: catalog.planIdBySlug,
-    addonIdBySlug: catalog.addonIdBySlug,
-    supportCategoryIdBySlug: support.supportCategoryIdBySlug,
-    staff,
-  });
+  if (process.env.SEED_DEMO_CUSTOMER === 'true') {
+    console.log('\nDemo account and activity');
+    await seedDemoData(prisma, {
+      cityIdBySlug: geography.cityIdBySlug,
+      areaIdByKey: geography.areaIdByKey,
+      subAreaIdByKey: geography.subAreaIdByKey,
+      planIdBySlug: catalog.planIdBySlug,
+      addonIdBySlug: catalog.addonIdBySlug,
+      supportCategoryIdBySlug: support.supportCategoryIdBySlug,
+      staff,
+    });
+  } else {
+    console.log('\nSkipping demo customer seed');
+  }
 
   console.log(`\nSeed complete in ${((Date.now() - startedAt) / 1000).toFixed(1)}s`);
 }

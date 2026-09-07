@@ -24,6 +24,13 @@ import { ApplicationsModule } from './modules/applications/applications.module';
 import { CustomersModule } from './modules/customers/customers.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
 import { BillingModule } from './modules/billing/billing.module';
+import { OrdersModule } from './modules/orders/orders.module';
+import { StorageModule } from './modules/storage/storage.module';
+import { SupportModule } from './modules/support/support.module';
+import { CallbacksModule } from './modules/callbacks/callbacks.module';
+import { CmsModule } from './modules/cms/cms.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { AdminModule } from './modules/admin/admin.module';
 
 /**
  * Root module.
@@ -46,6 +53,8 @@ import { BillingModule } from './modules/billing/billing.module';
     QueueModule,
     AuditModule,
     SequenceModule,
+    StorageModule,
+    AnalyticsModule,
     AuthModule,
     NotificationsModule,
     GeographyModule,
@@ -55,6 +64,11 @@ import { BillingModule } from './modules/billing/billing.module';
     CustomersModule,
     SubscriptionsModule,
     BillingModule,
+    OrdersModule,
+    SupportModule,
+    CallbacksModule,
+    CmsModule,
+    AdminModule,
     HealthModule,
   ],
   providers: [

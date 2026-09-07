@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { paginationQuerySchema } from './common';
 import { messageSchema, slugSchema, uuidSchema } from './primitives';
 
 export const ticketPrioritySchema = z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']);
@@ -32,13 +33,19 @@ export const updateTicketSchema = z.object({
   note: z.string().trim().max(1000).optional(),
 });
 
-export const ticketListQuerySchema = z.object({
+export const ticketListQuerySchema = paginationQuerySchema.extend({
   status: ticketStatusSchema.optional(),
   priority: ticketPrioritySchema.optional(),
   categoryId: uuidSchema.optional(),
   assignedToId: uuidSchema.optional(),
   customerId: uuidSchema.optional(),
 });
+
+export const customerTicketQuerySchema = paginationQuerySchema
+  .omit({ search: true, sort: true })
+  .extend({
+    status: ticketStatusSchema.optional(),
+  });
 
 export const faqSearchSchema = z.object({
   search: z.string().trim().max(120).optional(),
@@ -77,3 +84,4 @@ export type CreateTicketInput = z.input<typeof createTicketSchema>;
 export type CreateTicketMessageInput = z.input<typeof createTicketMessageSchema>;
 export type UpdateTicketInput = z.input<typeof updateTicketSchema>;
 export type UpsertFaqInput = z.input<typeof upsertFaqSchema>;
+export type CustomerTicketQuery = z.output<typeof customerTicketQuerySchema>;

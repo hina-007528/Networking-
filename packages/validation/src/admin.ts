@@ -1,4 +1,7 @@
 import { z } from 'zod';
+import { paginationQuerySchema, planKindSchema, publishStatusSchema } from './common';
+import { applicationListQuerySchema } from './applications';
+import { invoiceListQuerySchema, paymentListQuerySchema } from './billing';
 import { emailSchema, mobileSchema, nameSchema, passwordSchema, uuidSchema } from './primitives';
 
 export const roleNameSchema = z.enum([
@@ -30,6 +33,16 @@ export const updateStaffUserSchema = z.object({
 
 export const updateRolePermissionsSchema = z.object({
   permissions: z.array(z.string().trim().min(3).max(60)).max(80),
+});
+
+export const createCustomerSchema = z.object({
+  firstName: nameSchema,
+  lastName: nameSchema,
+  email: emailSchema,
+  mobile: mobileSchema,
+  password: passwordSchema,
+  addressLine: z.string().trim().min(10).max(255),
+  status: z.enum(['PROSPECT', 'ACTIVE', 'SUSPENDED', 'CHURNED']).default('PROSPECT'),
 });
 
 export const updateCustomerSchema = z.object({
@@ -66,6 +79,57 @@ export const auditLogQuerySchema = z.object({
 export const analyticsRangeQuerySchema = z.object({
   days: z.coerce.number().int().min(1).max(365).default(30),
   cityId: uuidSchema.optional(),
+});
+
+export const adminCustomerListQuerySchema = paginationQuerySchema.merge(customerListQuerySchema);
+export const adminApplicationListQuerySchema = paginationQuerySchema.merge(applicationListQuerySchema);
+export const adminInvoiceListQuerySchema = paginationQuerySchema.merge(invoiceListQuerySchema);
+export const adminPaymentListQuerySchema = paginationQuerySchema.merge(paymentListQuerySchema);
+export const adminAuditListQuerySchema = paginationQuerySchema.merge(auditLogQuerySchema);
+export const adminCallbackListQuerySchema = paginationQuerySchema.extend({
+  status: z.enum(['NEW', 'CONTACTED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']).optional(),
+});
+
+export const adminPlanListQuerySchema = paginationQuerySchema.extend({
+  status: publishStatusSchema.optional(),
+  kind: planKindSchema.optional(),
+});
+
+export const adminProductListQuerySchema = paginationQuerySchema.extend({
+  status: publishStatusSchema.optional(),
+  serviceType: z.enum(['INTERNET', 'TV', 'PHONE']).optional(),
+});
+
+export const adminFaqListQuerySchema = paginationQuerySchema.extend({
+  status: publishStatusSchema.optional(),
+  categoryId: uuidSchema.optional(),
+});
+
+export const adminStaffListQuerySchema = paginationQuerySchema.extend({
+  status: z.enum(['PENDING_VERIFICATION', 'ACTIVE', 'SUSPENDED', 'DISABLED']).optional(),
+  role: roleNameSchema.optional(),
+});
+
+export const adminSubscriptionListQuerySchema = paginationQuerySchema.extend({
+  status: z.enum(['PENDING', 'ACTIVE', 'SUSPENDED', 'CANCELLED', 'EXPIRED']).optional(),
+  cityId: uuidSchema.optional(),
+  planId: uuidSchema.optional(),
+});
+
+export const adminLeadListQuerySchema = paginationQuerySchema.extend({
+  status: z.enum(['NEW', 'CONTACTED', 'QUALIFIED', 'CONVERTED', 'LOST']).optional(),
+  cityId: uuidSchema.optional(),
+});
+
+export const adminCoverageZoneListQuerySchema = paginationQuerySchema.extend({
+  cityId: uuidSchema.optional(),
+  status: z.enum(['AVAILABLE', 'NOT_AVAILABLE', 'COMING_SOON']).optional(),
+});
+
+export const updateCoverageLeadSchema = z.object({
+  status: z.enum(['NEW', 'CONTACTED', 'QUALIFIED', 'CONVERTED', 'LOST']).optional(),
+  assignedToId: uuidSchema.nullable().optional(),
+  notes: z.string().trim().max(1000).optional(),
 });
 
 export type CreateStaffUserInput = z.input<typeof createStaffUserSchema>;

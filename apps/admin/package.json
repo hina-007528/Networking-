@@ -1,0 +1,30 @@
+{
+  "name": "@stormfiber/admin",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --port 3001",
+    "build": "next build",
+    "start": "next start --port 3001",
+    "lint": "eslint src",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "echo \"admin tests run via Playwright later\"",
+    "clean": "rimraf .next .turbo"
+  },
+  "dependencies": {
+    "next": "15.1.6",
+    "react": "19.0.0",
+    "react-dom": "19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.10.7",
+    "@types/react": "19.0.7",
+    "@types/react-dom": "19.0.3",
+    "autoprefixer": "10.4.20",
+    "eslint": "9.18.0",
+    "postcss": "8.4.49",
+    "rimraf": "6.0.1",
+    "tailwindcss": "3.4.17",
+    "typescript": "5.7.3"
+  }
+}

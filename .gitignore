@@ -44,3 +44,13 @@ Thumbs.db
 .vscode/*
 !.vscode/settings.json
 !.vscode/extensions.json
+
+# local leftovers — never publish
+cookies.txt
+links.txt
+storm.html
+fetch_routes.js
+fetch_routes.py
+parse_html.js
+tmp-node-procs.txt
+Untitled_recording*.mp4

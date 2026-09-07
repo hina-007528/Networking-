@@ -15,8 +15,8 @@ export const seedHeroSlides = [
     headlineAccent: 'future',
     subheadline:
       'Symmetric fibre internet, high-definition television and a landline that never drops — all on one line.',
-    desktopImageUrl: '/media/hero/network-desktop.svg',
-    mobileImageUrl: '/media/hero/network-mobile.svg',
+    desktopImageUrl: '/hero-freedom.png',
+    mobileImageUrl: '/hero-freedom.png',
     imageAlt: 'Abstract illustration of a fibre-optic network fanning out across a city',
     primaryCtaLabel: 'Check availability',
     primaryCtaHref: '/check-availability',
@@ -32,8 +32,8 @@ export const seedHeroSlides = [
     headlineAccent: 'download',
     subheadline:
       'Every plan is symmetric, from 20 to 275 Mbps. Cloud backups and video calls stop being a compromise.',
-    desktopImageUrl: '/media/hero/speed-desktop.svg',
-    mobileImageUrl: '/media/hero/speed-mobile.svg',
+    desktopImageUrl: '/hero-speed.png',
+    mobileImageUrl: '/hero-speed.png',
     imageAlt: 'Illustration of matched upload and download speed indicators',
     primaryCtaLabel: 'Compare plans',
     primaryCtaHref: '/plans',
@@ -49,8 +49,8 @@ export const seedHeroSlides = [
     headlineAccent: '20% off',
     subheadline:
       'Twenty percent off your first three months on selected 50 and 100 Mbps plans, with reduced installation.',
-    desktopImageUrl: '/media/hero/offer-desktop.svg',
-    mobileImageUrl: '/media/hero/offer-mobile.svg',
+    desktopImageUrl: '/tv-bundle.png',
+    mobileImageUrl: '/tv-bundle.png',
     imageAlt: 'Promotional artwork for the Monsoon Surge offer',
     primaryCtaLabel: 'View the offer',
     primaryCtaHref: '/offers/monsoon-surge',
@@ -437,6 +437,19 @@ Residential plans are provisioned for household use. If you are running services
 guaranteed capacity, a static address or an availability commitment, a business product is the
 correct fit and we will help you move to one.`,
   },
+  {
+    slug: 'about',
+    title: 'About Majawar X Network',
+    excerpt: 'Fibre for Lahore homes — one line, one bill, one helpline.',
+    status: PublishStatus.PUBLISHED,
+    seoTitle: 'About Majawar X Network',
+    seoDescription: 'Who we are, where we operate, and how to reach Majawar X Network in Lahore.',
+    body: `Majawar X Network is a fibre internet provider based in Lahore. We connect homes that need a stable line for school, work, and evening television — without asking the household to juggle three different vendors.
+
+Our mission is a serviceable, documented fibre drop, a bill that matches the plan on the card, and a helpline that answers in Pakistan Standard Time.
+
+Edit this page in the admin CMS whenever the company story changes.`,
+  },
 ];
 
 export const seedSiteSettings = {
@@ -448,10 +461,9 @@ export const seedSiteSettings = {
     href: '/offers/monsoon-surge',
   },
   socialLinks: [
-    { platform: 'facebook', url: 'https://example.com/stormfiber' },
-    { platform: 'instagram', url: 'https://example.com/stormfiber' },
-    { platform: 'x', url: 'https://example.com/stormfiber' },
-    { platform: 'linkedin', url: 'https://example.com/stormfiber' },
+    { platform: 'whatsapp', url: 'https://wa.me/923257862291' },
+    { platform: 'instagram', url: 'https://www.instagram.com/majawar_x_network?igsi=bDVhMmF1bmpkOGdo' },
+    { platform: 'linkedin', url: 'https://www.linkedin.com/company/majawar-x-networks/' },
   ],
   footerColumns: [
     {

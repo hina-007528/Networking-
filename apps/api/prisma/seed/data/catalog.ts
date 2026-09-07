@@ -600,6 +600,7 @@ export const seedProducts = [
     description:
       'Our network is 100% fibre from the exchange to the socket in your wall — no copper in the last mile, no shared coaxial segment. That is why the upload speed matches the download speed and why the connection behaves the same at 9pm as it does at 9am.',
     iconKey: 'wifi',
+    imageUrl: '/heroes/hero-internet.png',
     displayOrder: 1,
     seoTitle: 'Ultra-Fast Fibre Internet',
     seoDescription:
@@ -641,6 +642,7 @@ export const seedProducts = [
     description:
       'Digital television delivered over the same fibre as your internet, with a set-top box that changes channels instantly and a programming guide that actually stays up to date.',
     iconKey: 'tv',
+    imageUrl: '/images/products/hdtv.png',
     displayOrder: 2,
     seoTitle: 'HD Television over Fibre',
     seoDescription:
@@ -682,6 +684,7 @@ export const seedProducts = [
     description:
       'A postpaid landline carried over fibre. Because it does not depend on mobile coverage, it keeps working when the cellular network is congested or down.',
     iconKey: 'phone',
+    imageUrl: '/heroes/hero-voice.png',
     displayOrder: 3,
     seoTitle: 'Crystal Clear Voice — Home Phone on Fibre',
     seoDescription:
@@ -711,6 +714,86 @@ export const seedProducts = [
       },
     ],
   },
+  {
+    name: 'Home Mesh Wi-Fi',
+    slug: 'home-mesh-wifi',
+    serviceType: ServiceType.INTERNET,
+    tagline: 'Whole-home coverage on the same Majawar X drop',
+    heroHeadline: 'Dead zones, gone.',
+    heroSubheadline: 'Mesh nodes that follow the fibre into every floor.',
+    description:
+      'Add managed mesh nodes so upstairs rooms, courtyards and back offices stay on the same Majawar X line without a second broadband account.',
+    iconKey: 'router',
+    imageUrl: '/images/products/mesh-wifi.png',
+    displayOrder: 4,
+    seoTitle: 'Home Mesh Wi-Fi',
+    seoDescription: 'Whole-home mesh coverage on a Majawar X fibre line.',
+    features: [
+      { title: 'One network name', description: 'Phones roam between nodes without dropping the call or the stream.', iconKey: 'wifi' },
+      { title: 'Installed with the drop', description: 'Nodes are placed during installation or on a follow-up visit.', iconKey: 'home' },
+      { title: 'Replaced under warranty', description: 'A failed node is swapped, not billed as a new device.', iconKey: 'shield' },
+    ],
+  },
+  {
+    name: 'Night Watch Cameras',
+    slug: 'night-watch-cameras',
+    serviceType: ServiceType.INTERNET,
+    tagline: 'Keep an eye on the gate on a line that stays up',
+    heroHeadline: 'The gate, from the sofa.',
+    heroSubheadline: 'Cameras that ride the same fibre as the household internet.',
+    description:
+      'A small camera pack for the gate and driveway, recorded locally and viewable on the Majawar X app — useful when the mobile network is busy.',
+    iconKey: 'camera',
+    imageUrl: '/heroes/hero-cameras.png',
+    displayOrder: 5,
+    seoTitle: 'Night Watch Cameras',
+    seoDescription: 'Home cameras on a Majawar X fibre line.',
+    features: [
+      { title: 'Local recording', description: 'Clips stay on a box in the house, not only in a foreign cloud.', iconKey: 'hard-drive' },
+      { title: 'Night picture', description: 'Infrared on the gate camera so the number plate is still readable.', iconKey: 'moon' },
+      { title: 'Same bill', description: 'Camera rental appears as a line on the monthly fibre invoice.', iconKey: 'receipt' },
+    ],
+  },
+  {
+    name: 'Weekend Sports Pack',
+    slug: 'weekend-sports-pack',
+    serviceType: ServiceType.TV,
+    tagline: 'Match days without buffering the living room',
+    heroHeadline: 'The match, in the house.',
+    heroSubheadline: 'Sports channels on the same fibre as your broadband.',
+    description:
+      'A television add-on for households that want the weekend fixtures in HD without opening a second streaming subscription.',
+    iconKey: 'sports',
+    imageUrl: '/tv-bundle.png',
+    displayOrder: 6,
+    seoTitle: 'Weekend Sports Pack',
+    seoDescription: 'HD sports channels on Majawar X television.',
+    features: [
+      { title: 'HD fixtures', description: 'Main cricket and football channels delivered over the fibre set-top box.', iconKey: 'tv' },
+      { title: 'Guide that stays current', description: 'Kick-off times appear in the on-screen programme guide.', iconKey: 'calendar' },
+      { title: 'No extra dish', description: 'The pack rides the existing fibre drop and decoder.', iconKey: 'wifi' },
+    ],
+  },
+  {
+    name: 'Study Line',
+    slug: 'study-line',
+    serviceType: ServiceType.INTERNET,
+    tagline: 'A quieter lane for classes and homework',
+    heroHeadline: 'Classes first.',
+    heroSubheadline: 'A profile that keeps video lessons ahead of evening downloads.',
+    description:
+      'A household profile that reserves a slice of the Majawar X line for school portals and video classes during the afternoon.',
+    iconKey: 'book',
+    imageUrl: '/heroes/hero-study.png',
+    displayOrder: 7,
+    seoTitle: 'Study Line',
+    seoDescription: 'A Majawar X profile that keeps homework and classes moving.',
+    features: [
+      { title: 'Afternoon priority', description: 'Class traffic is preferred between 1pm and 6pm on school days.', iconKey: 'clock' },
+      { title: 'Same socket', description: 'No second router — it is a profile on the existing fibre gateway.', iconKey: 'router' },
+      { title: 'Parent view', description: 'A simple usage summary on the customer portal after you sign in.', iconKey: 'bar-chart' },
+    ],
+  },
 ];
 
 /** Tax rules. Rates reflect the kind of telecom taxation an operator in Pakistan applies. */
@@ -735,18 +818,9 @@ export const seedTaxRules = [
  * Cities where the capital-territory rate differs from the provincial rate. The pricing engine
  * reads the override rather than hard-coding any city.
  */
-export const seedCityTaxOverrides = [{ citySlug: 'islamabad', taxCode: 'GST_TELECOM', rate: 15 }];
+export const seedCityTaxOverrides: { citySlug: string; taxCode: string; rate: number }[] = [];
 
 /** Percentage adjustment applied to the national list price to derive city pricing. */
 export const seedCityPriceAdjustments: { citySlug: string; adjustmentPercent: number }[] = [
-  { citySlug: 'karachi', adjustmentPercent: 0 },
   { citySlug: 'lahore', adjustmentPercent: 0 },
-  { citySlug: 'islamabad', adjustmentPercent: 3 },
-  { citySlug: 'rawalpindi', adjustmentPercent: 2 },
-  { citySlug: 'faisalabad', adjustmentPercent: -3 },
-  { citySlug: 'multan', adjustmentPercent: -4 },
-  { citySlug: 'peshawar', adjustmentPercent: -2 },
-  { citySlug: 'hyderabad', adjustmentPercent: -5 },
-  { citySlug: 'quetta', adjustmentPercent: 4 },
-  { citySlug: 'swat', adjustmentPercent: 5 },
 ];

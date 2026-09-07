@@ -1,15 +1,15 @@
 import { Controller, Get } from '@nestjs/common';
 import {
   HealthCheck,
-  type HealthCheckService,
+  HealthCheckService,
   type HealthIndicatorResult,
-  type MemoryHealthIndicator,
+  MemoryHealthIndicator,
 } from '@nestjs/terminus';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Public } from '../../common/decorators/auth.decorators';
 import { SkipEnvelope } from '../../common/decorators/response.decorators';
-import { type CacheService } from '../../common/cache/cache.service';
-import { type PrismaService } from '../../common/prisma/prisma.service';
+import { CacheService } from '../../common/cache/cache.service';
+import { PrismaService } from '../../common/prisma/prisma.service';
 
 @ApiTags('Health')
 @Controller('health')

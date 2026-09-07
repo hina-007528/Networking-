@@ -1,42 +1,43 @@
 /**
- * Design tokens for the StormFiber platform.
- *
- * These are the single source of truth for colour, type, spacing, radius, elevation and motion.
- * The Tailwind preset in `tailwind-preset.ts` is generated from this file, and CSS custom
- * properties are emitted from it too, so a token can never drift between the two systems.
- *
- * The palette is our own: a deep "storm" blue for structure and trust, an electric "surge" cyan
- * for actions and speed, and a warm amber reserved exclusively for promotional emphasis.
+ * Design tokens for Majawar X Network.
+ * Navy / cyan / purple mapped onto the existing storm / surge token names so Tailwind classes keep working.
  */
 
 export const colorTokens = {
+  brand: {
+    900: '#0C2340',
+    600: '#145DA0',
+    400: '#2E86DE',
+    cyan: '#7FD1F0',
+    purple: '#6C63FF',
+  },
   /** Primary brand colour. Used for structure, links and primary emphasis. */
   storm: {
-    50: '#F0F6FF',
-    100: '#DEEBFF',
-    200: '#BFD8FF',
-    300: '#94BCFF',
-    400: '#5F97FB',
-    500: '#3573EF',
-    600: '#1F55D4',
-    700: '#1943A9',
-    800: '#1A3B85',
-    900: '#1B3469',
-    950: '#12203F',
+    50: '#F3F7FC',
+    100: '#E4EEF8',
+    200: '#C5D9F0',
+    300: '#8FB6DE',
+    400: '#2E86DE',
+    500: '#145DA0',
+    600: '#145DA0',
+    700: '#0F4A80',
+    800: '#0C2340',
+    900: '#0C2340',
+    950: '#081628',
   },
   /** Action colour. Reserved for CTAs, active states and speed messaging. */
   surge: {
-    50: '#ECFDFF',
-    100: '#D0F7FF',
-    200: '#A6EEFF',
-    300: '#6EE0FA',
-    400: '#2FCAEC',
-    500: '#12AACD',
-    600: '#0B87A8',
-    700: '#0E6B87',
-    800: '#12586E',
-    900: '#14495C',
-    950: '#062F3D',
+    50: '#F0FBFF',
+    100: '#D8F3FC',
+    200: '#B3E7F8',
+    300: '#7FD1F0',
+    400: '#4BB8E6',
+    500: '#2E86DE',
+    600: '#145DA0',
+    700: '#0F4A80',
+    800: '#0C2340',
+    900: '#0C2340',
+    950: '#081628',
   },
   /** Promotional accent. Only used for offers, badges and limited-time messaging. */
   ember: {

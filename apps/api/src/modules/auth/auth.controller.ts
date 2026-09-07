@@ -34,8 +34,8 @@ import { Ctx, CurrentUser, Public, type RequestContext } from '../../common/deco
 import { ResponseMessage } from '../../common/decorators/response.decorators';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { ApiEnvelope, ApiErrorEnvelope, ApiZodBody } from '../../common/swagger/zod-swagger';
-import { type AuthService, type RegisterInput } from './auth.service';
-import { type OtpService } from './otp.service';
+import { AuthService, type RegisterInput } from './auth.service';
+import { OtpService } from './otp.service';
 import { REFRESH_COOKIE_NAME } from './tokens.service';
 
 /** Reads the refresh token from the HTTP-only cookie, or the body for non-browser clients. */
@@ -56,7 +56,7 @@ export class AuthController {
   @Public()
   @Throttle({ default: { limit: 5, ttl: 300_000 } })
   @ResponseMessage('Verification code sent')
-  @ApiOperation({ summary: 'Send a one-time verification code by SMS' })
+  @ApiOperation({ summary: 'Email a one-time verification code (never returned in the API)' })
   @ApiZodBody(otpRequestSchema)
   @ApiEnvelope(HttpStatus.CREATED, 'Code dispatched')
   @ApiErrorEnvelope(HttpStatus.TOO_MANY_REQUESTS, 'Cooldown or hourly limit reached', 'OTP_COOLDOWN')
@@ -71,7 +71,7 @@ export class AuthController {
   @Post('otp/verify')
   @Public()
   @Throttle({ default: { limit: 10, ttl: 300_000 } })
-  @ResponseMessage('Mobile number verified')
+  @ResponseMessage('Email verified')
   @ApiOperation({ summary: 'Verify a one-time code and receive a short-lived proof token' })
   @ApiZodBody(otpVerifySchema)
   @ApiErrorEnvelope(HttpStatus.BAD_REQUEST, 'Code incorrect or expired', 'OTP_INVALID')
@@ -116,6 +116,7 @@ export class AuthController {
   @Post('refresh')
   @Public()
   @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @ResponseMessage('Session refreshed')
   @ApiOperation({ summary: 'Exchange the refresh cookie for a new access token' })
   @ApiErrorEnvelope(HttpStatus.UNAUTHORIZED, 'Refresh token missing, expired or replayed', 'TOKEN_INVALID')

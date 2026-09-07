@@ -4,7 +4,7 @@ import {
   Injectable,
   type NestInterceptor,
 } from '@nestjs/common';
-import { type Reflector } from '@nestjs/core';
+import { Reflector } from '@nestjs/core';
 import type { ApiSuccess } from '@stormfiber/types';
 import type { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';

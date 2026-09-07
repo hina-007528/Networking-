@@ -13,6 +13,10 @@ export const nestConfig = [
       '@typescript-eslint/no-extraneous-class': 'off',
       '@typescript-eslint/interface-name-prefix': 'off',
       '@typescript-eslint/explicit-module-boundary-types': 'off',
+      // Nest resolves constructor dependencies from `emitDecoratorMetadata`, which is erased for
+      // type-only imports. Enforcing type imports here silently turns injected services into
+      // `Object` and breaks DI at runtime, so the API keeps value imports.
+      '@typescript-eslint/consistent-type-imports': 'off',
     },
   },
   {

@@ -4,7 +4,7 @@ import type { OfferDetailDto, PromotionDto } from '@stormfiber/types';
 import { slugParamSchema } from '@stormfiber/validation';
 import { Public } from '../../common/decorators/auth.decorators';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
-import { type PlansService } from './plans.service';
+import { PlansService } from './plans.service';
 
 /** Promotions are published to the public site as "offers". */
 @ApiTags('Offers')

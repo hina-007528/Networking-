@@ -1,4 +1,4 @@
-import type { TicketPriority, TicketStatus } from '../enums';
+import type { PublishStatus, TicketPriority, TicketStatus } from '../enums';
 
 export interface SupportCategoryDto {
   id: string;
@@ -28,6 +28,7 @@ export interface FaqDto {
   categoryName: string | null;
   categorySlug: string | null;
   tags: string[];
+  status?: PublishStatus;
   displayOrder: number;
   helpfulCount: number;
   updatedAt: string;

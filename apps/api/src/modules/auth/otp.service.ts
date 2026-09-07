@@ -1,12 +1,13 @@
 import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
-import { createHash, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
+import { randomBytes, randomInt } from 'node:crypto';
 import type { OtpPurpose } from '@prisma/client';
 import { NotificationEvent, type OtpRequestResult, type OtpVerifyResult } from '@stormfiber/types';
 import { APP_CONFIG, type AppConfig } from '../../config/configuration';
-import { type PrismaService } from '../../common/prisma/prisma.service';
+import { PrismaService } from '../../common/prisma/prisma.service';
 import { AppException } from '../../common/errors/app.exception';
 import type { RequestContext } from '../../common/decorators/auth.decorators';
-import { type NotificationsService } from '../notifications/notifications.service';
+import { hashOtp, otpMatches } from '../../common/utils/otp-hash';
+import { NotificationsService } from '../notifications/notifications.service';
 
 /**
  * One-time passcode issuance and verification.
@@ -27,7 +28,7 @@ export class OtpService {
   ) {}
 
   private hash(value: string): string {
-    return createHash('sha256').update(value).digest('hex');
+    return hashOtp(value, this.config.auth.jwtSecret);
   }
 
   private generateCode(): string {
@@ -39,7 +40,21 @@ export class OtpService {
     input: { mobile: string; purpose: OtpPurpose; email?: string },
     context: RequestContext | null,
   ): Promise<OtpRequestResult> {
-    await this.enforceCooldown(input.mobile, input.purpose);
+    if (
+      (input.purpose === 'REGISTRATION' || input.purpose === 'APPLICATION') &&
+      !input.email
+    ) {
+      throw AppException.of(
+        'VALIDATION_ERROR',
+        'Enter your email so we can send the confirmation code',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    await this.enforceCooldown(input.mobile, input.purpose, {
+      email: input.email,
+      ipAddress: context?.ipAddress,
+    });
 
     const code = this.generateCode();
     const now = Date.now();
@@ -58,11 +73,17 @@ export class OtpService {
       select: { id: true, createdAt: true },
     });
 
-    await this.notifications.sendTransient(
-      NotificationEvent.OTP_REQUESTED,
-      { code, expiryMinutes: Math.round(this.config.otp.ttlSeconds / 60) },
-      { mobile: input.mobile, email: input.email ?? null },
-    );
+    void this.notifications
+      .sendTransient(
+        NotificationEvent.OTP_REQUESTED,
+        { code, expiryMinutes: Math.round(this.config.otp.ttlSeconds / 60) },
+        { mobile: input.mobile, email: input.email ?? null },
+      )
+      .catch((error) => {
+        this.logger.warn(
+          `OTP delivery for ${input.mobile} failed: ${error instanceof Error ? error.message : 'unknown'}`,
+        );
+      });
 
     const result: OtpRequestResult = {
       requestId: record.id,
@@ -75,11 +96,6 @@ export class OtpService {
       attemptsRemaining: this.config.otp.maxAttempts,
     };
 
-    // Development convenience only; the environment schema forbids this flag in production.
-    if (this.config.otp.devEcho && !this.config.isProduction) {
-      result.devCode = code;
-    }
-
     return result;
   }
 
@@ -87,7 +103,11 @@ export class OtpService {
    * Rate-limits resends per mobile number and purpose. This is enforced in the database rather
    * than in memory so it survives a restart and holds across API instances.
    */
-  private async enforceCooldown(mobile: string, purpose: OtpPurpose): Promise<void> {
+  private async enforceCooldown(
+    mobile: string,
+    purpose: OtpPurpose,
+    extras: { email?: string | null; ipAddress?: string | null },
+  ): Promise<void> {
     const cooldownMs = this.config.otp.resendCooldownSeconds * 1000;
     const latest = await this.prisma.otpRequest.findFirst({
       where: { mobile, purpose },
@@ -106,14 +126,38 @@ export class OtpService {
       }
     }
 
+    const hourAgo = new Date(Date.now() - 60 * 60 * 1000);
+
     const hourlyCount = await this.prisma.otpRequest.count({
-      where: { mobile, createdAt: { gte: new Date(Date.now() - 60 * 60 * 1000) } },
+      where: { mobile, createdAt: { gte: hourAgo } },
     });
 
     if (hourlyCount >= 8) {
       throw AppException.rateLimited(
         'Too many verification codes requested for this number. Please try again later.',
       );
+    }
+
+    if (extras.email) {
+      const emailCount = await this.prisma.otpRequest.count({
+        where: { email: extras.email, createdAt: { gte: hourAgo } },
+      });
+      if (emailCount >= 8) {
+        throw AppException.rateLimited(
+          'Too many verification codes requested for this email. Please try again later.',
+        );
+      }
+    }
+
+    if (extras.ipAddress) {
+      const ipCount = await this.prisma.otpRequest.count({
+        where: { ipAddress: extras.ipAddress, createdAt: { gte: hourAgo } },
+      });
+      if (ipCount >= 20) {
+        throw AppException.rateLimited(
+          'Too many verification codes requested from this network. Please try again later.',
+        );
+      }
     }
   }
 
@@ -229,9 +273,7 @@ export class OtpService {
 
   /** Constant-time comparison so a response time cannot reveal how much of the code matched. */
   private matches(code: string, storedHash: string): boolean {
-    const candidate = Buffer.from(this.hash(code), 'hex');
-    const stored = Buffer.from(storedHash, 'hex');
-    return candidate.length === stored.length && timingSafeEqual(candidate, stored);
+    return otpMatches(code, storedHash, this.config.auth.jwtSecret);
   }
 
   /** Removes expired requests. Called by the maintenance job. */

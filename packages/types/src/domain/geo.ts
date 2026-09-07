@@ -49,17 +49,27 @@ export interface CoverageCheckRequest {
 }
 
 export interface CoverageCheckResult {
-  checkId: string;
+  checkId: string | null;
   status: CoverageStatus;
-  /** Human-readable resolved location, e.g. "D.H.A. Phase 6, Karachi". */
+  serviceable: boolean;
+  outsideServiceCity: boolean;
+  /** Human-readable resolved location, e.g. "D.H.A. Phase 5, Lahore". */
   locationLabel: string;
-  city: Pick<CityDto, 'id' | 'name' | 'slug'>;
+  city: Pick<CityDto, 'id' | 'name' | 'slug'> | null;
   area: Pick<AreaDto, 'id' | 'name' | 'slug'> | null;
   subArea: Pick<SubAreaDto, 'id' | 'name' | 'slug'> | null;
   expectedLiveDate: string | null;
   message: string;
   /** Populated when status is AVAILABLE so the UI can show plans immediately. */
   availablePlanCount: number;
+}
+
+export interface CityWaitlistDto {
+  id: string;
+  name: string;
+  phone: string;
+  city: string;
+  createdAt: string;
 }
 
 export interface CoverageLeadRequest {
@@ -111,4 +121,21 @@ export interface CoverageSummaryDto {
   totalCities: number;
   liveCities: number;
   totalAreasCovered: number;
+}
+
+/** Authoritative coverage zone as managed by operators. */
+export interface CoverageZoneDto {
+  id: string;
+  name: string;
+  cityId: string;
+  cityName: string;
+  areaId: string | null;
+  areaName: string | null;
+  subAreaId: string | null;
+  subAreaName: string | null;
+  status: CoverageStatus;
+  expectedLiveDate: string | null;
+  capacityNote: string | null;
+  isActive: boolean;
+  updatedAt: string;
 }

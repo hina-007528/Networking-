@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { redactSecrets } from '../../../common/utils/otp-hash';
 import { APP_CONFIG, type AppConfig } from '../../../config/configuration';
 
 export interface SmsMessage {
@@ -26,7 +27,7 @@ export class ConsoleSmsProvider implements SmsProvider {
   private readonly logger = new Logger(ConsoleSmsProvider.name);
 
   async send(message: SmsMessage): Promise<SmsDeliveryResult> {
-    this.logger.log(`[sms → ${message.to}] ${message.body}`);
+    this.logger.log(`[sms → ${message.to}] ${redactSecrets(message.body)}`);
     return { delivered: true, providerRef: `console-${Date.now()}` };
   }
 }

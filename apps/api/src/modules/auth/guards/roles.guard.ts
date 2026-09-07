@@ -1,7 +1,7 @@
 import { type CanActivate, type ExecutionContext, Injectable } from '@nestjs/common';
-import { type Reflector } from '@nestjs/core';
+import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
-import type { Permission, RoleName } from '@stormfiber/types';
+import { RoleName, type Permission } from '@stormfiber/types';
 import { AppException } from '../../../common/errors/app.exception';
 import { PERMISSIONS_KEY, ROLES_KEY } from '../../../common/decorators/auth.decorators';
 import type { AuthenticatedUser } from '../../../common/types/authenticated-user';
@@ -34,6 +34,10 @@ export class RolesGuard implements CanActivate {
 
     if (!user) {
       throw AppException.unauthorized('Sign in to continue');
+    }
+
+    if (user.roles.includes(RoleName.SUPER_ADMIN)) {
+      return true;
     }
 
     if (requiredRoles?.length && !requiredRoles.some((role) => user.roles.includes(role))) {

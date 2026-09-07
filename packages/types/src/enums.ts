@@ -125,6 +125,29 @@ export const PaymentMethod = {
   MOBILE_WALLET: 'MOBILE_WALLET',
   CASH: 'CASH',
 } as const;
+
+export const OrderStatus = {
+  PENDING_OTP: 'PENDING_OTP',
+  CONFIRMED: 'CONFIRMED',
+  EXPIRED: 'EXPIRED',
+  CANCELLED: 'CANCELLED',
+  SCHEDULED: 'SCHEDULED',
+  INSTALLED: 'INSTALLED',
+} as const;
+export type OrderStatus = (typeof OrderStatus)[keyof typeof OrderStatus];
+
+export const NotifyStatus = {
+  SENT: 'SENT',
+  FAILED: 'FAILED',
+} as const;
+export type NotifyStatus = (typeof NotifyStatus)[keyof typeof NotifyStatus];
+
+export const InvoicePaidMethod = {
+  CASH: 'cash',
+  BANK_TRANSFER: 'bank_transfer',
+  OFFICE: 'office',
+} as const;
+export type InvoicePaidMethod = (typeof InvoicePaidMethod)[keyof typeof InvoicePaidMethod];
 export type PaymentMethod = (typeof PaymentMethod)[keyof typeof PaymentMethod];
 
 export const RefundStatus = {
@@ -216,6 +239,7 @@ export type NotificationChannel = (typeof NotificationChannel)[keyof typeof Noti
 
 export const NotificationEvent = {
   USER_REGISTERED: 'USER_REGISTERED',
+  USER_REGISTERED_ADMIN: 'USER_REGISTERED_ADMIN',
   OTP_REQUESTED: 'OTP_REQUESTED',
   APPLICATION_SUBMITTED: 'APPLICATION_SUBMITTED',
   APPLICATION_APPROVED: 'APPLICATION_APPROVED',
@@ -231,6 +255,9 @@ export const NotificationEvent = {
   /** Sent when an approved applicant has an account created for them. */
   ACCOUNT_INVITED: 'ACCOUNT_INVITED',
   SUBSCRIPTION_CHANGED: 'SUBSCRIPTION_CHANGED',
+  ORDER_OTP: 'ORDER_OTP',
+  ORDER_CONFIRMED: 'ORDER_CONFIRMED',
+  ORDER_CONFIRMED_ADMIN: 'ORDER_CONFIRMED_ADMIN',
 } as const;
 export type NotificationEvent = (typeof NotificationEvent)[keyof typeof NotificationEvent];
 

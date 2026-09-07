@@ -18,6 +18,19 @@ export const Roles = (...roles: RoleName[]) => SetMetadata(ROLES_KEY, roles);
 export const RequirePermissions = (...permissions: Permission[]) =>
   SetMetadata(PERMISSIONS_KEY, permissions);
 
+/**
+ * Injects the authenticated principal when a token is present, otherwise `null`.
+ * Used on public routes that still want to attribute an event to a signed-in visitor.
+ */
+export const OptionalUser = createParamDecorator(
+  (property: keyof AuthenticatedUser | undefined, context: ExecutionContext) => {
+    const request = context.switchToHttp().getRequest<Request & { user?: AuthenticatedUser }>();
+    const user = request.user;
+    if (!user) return property ? undefined : null;
+    return property ? user[property] : user;
+  },
+);
+
 /** Injects the authenticated principal, or one of its properties. */
 export const CurrentUser = createParamDecorator(
   (property: keyof AuthenticatedUser | undefined, context: ExecutionContext) => {

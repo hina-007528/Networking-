@@ -6,7 +6,7 @@ import { Public } from '../../common/decorators/auth.decorators';
 import { ResponseMessage } from '../../common/decorators/response.decorators';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { ApiEnvelope, ApiErrorEnvelope, ApiZodBody } from '../../common/swagger/zod-swagger';
-import { type PricingService, type QuoteRequest } from './pricing.service';
+import { PricingService, type QuoteRequest } from './pricing.service';
 
 /**
  * The only endpoint that produces a price.

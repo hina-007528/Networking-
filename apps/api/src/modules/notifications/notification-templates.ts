@@ -1,4 +1,4 @@
-import { brand, formatCurrency, formatDate } from '@stormfiber/config';
+import { brand, formatCurrency, formatDate, SERVICE_CITY } from '@stormfiber/config';
 import { NotificationEvent } from '@stormfiber/types';
 
 export interface RenderedNotification {
@@ -27,6 +27,10 @@ export interface TemplateData {
   reason?: string;
   scheduledFor?: string | Date;
   href?: string;
+  phone?: string;
+  email?: string;
+  installAddress?: string;
+  customerName?: string;
 }
 
 const escapeHtml = (value: string): string =>
@@ -77,8 +81,8 @@ const templates: Record<string, Renderer> = {
     const minutes = data.expiryMinutes ?? 5;
     const code = data.code ?? '------';
     return {
-      subject: `${code} is your ${brand.name} verification code`,
-      html: layout('Verify your number', [
+      subject: `Your ${brand.name} verification code`,
+      html: layout('Verify your email', [
         greeting(data.firstName),
         `Your verification code is <strong style="font-size:24px;letter-spacing:4px">${escapeHtml(code)}</strong>`,
         `The code expires in ${minutes} minutes. If you did not request it, you can ignore this message.`,
@@ -90,14 +94,36 @@ const templates: Record<string, Renderer> = {
   },
 
   [NotificationEvent.USER_REGISTERED]: (data) => ({
-    subject: `Welcome to ${brand.name}`,
+    subject: `Welcome to ${brand.name} — your account is ready`,
     html: layout('Your account is ready', [
       greeting(data.firstName),
-      `Thanks for creating a ${brand.name} account. You can now check coverage, apply for a connection and manage billing from your dashboard.`,
-    ], { label: 'Open dashboard', url: data.href ?? '/dashboard' }),
-    text: `Welcome to ${brand.name}. Your account is ready — sign in to check coverage and manage your services.`,
-    sms: `Welcome to ${brand.name}! Your account is ready.`,
-    inApp: { title: 'Welcome to StormFiber', body: 'Your account is ready. Check coverage to get started.', href: '/dashboard' },
+      `Thank you for registering with ${brand.name}. Your customer account is now active.`,
+      data.reference ? `<strong>Account number:</strong> ${escapeHtml(data.reference)}` : '',
+      data.email ? `<strong>Sign-in email:</strong> ${escapeHtml(data.email)}` : '',
+      'You can sign in, check Lahore coverage, pick a plan and place an order from your dashboard. There is no online payment — settle at the office when asked.',
+    ].filter(Boolean), { label: 'Sign in', url: data.href ?? `${brand.website}/login` }),
+    text: `Welcome to ${brand.name}. Your account is ready${data.reference ? ` (${data.reference})` : ''}. Sign in at ${data.href ?? `${brand.website}/login`} to manage your services.`,
+    sms: `Welcome to ${brand.name}! Your account is ready. Sign in to continue.`,
+    inApp: { title: 'Welcome to Majawar X', body: 'Your account is ready. Check coverage to get started.', href: '/dashboard' },
+  }),
+
+  [NotificationEvent.USER_REGISTERED_ADMIN]: (data) => ({
+    subject: `New customer registered — ${data.customerName ?? data.firstName ?? 'account'}`,
+    html: layout('New customer registration', [
+      'A new customer completed registration on the website.',
+      `<strong>Name:</strong> ${escapeHtml(data.customerName ?? data.firstName ?? '—')}`,
+      `<strong>Email:</strong> ${escapeHtml(data.email ?? '—')}`,
+      `<strong>Phone:</strong> ${escapeHtml(data.phone ?? '—')}`,
+      data.reference ? `<strong>Account number:</strong> ${escapeHtml(data.reference)}` : '',
+      `<strong>City:</strong> ${escapeHtml(data.installAddress ?? SERVICE_CITY)}`,
+    ].filter(Boolean)),
+    text: `New ${brand.name} customer registered. Name: ${data.customerName ?? '—'}. Email: ${data.email ?? '—'}. Phone: ${data.phone ?? '—'}. Account: ${data.reference ?? '—'}.`,
+    sms: `New ${brand.name} customer: ${data.customerName ?? 'customer'} / ${data.phone ?? ''} / ${data.email ?? ''}`,
+    inApp: {
+      title: 'New customer registered',
+      body: `${data.customerName ?? 'A customer'} created an account.`,
+      href: '/customers',
+    },
   }),
 
   [NotificationEvent.APPLICATION_SUBMITTED]: (data) => ({
@@ -309,6 +335,61 @@ const templates: Record<string, Renderer> = {
       title: 'Subscription updated',
       body: data.planName ? `You are now on ${data.planName}.` : 'Your subscription has been updated.',
       href: '/dashboard/subscription',
+    },
+  }),
+
+  [NotificationEvent.ORDER_OTP]: (data) => {
+    const minutes = data.expiryMinutes ?? 10;
+    const code = data.code ?? '------';
+    return {
+      subject: `Your ${brand.name} order confirmation code`,
+      html: layout('Confirm your order', [
+        greeting(data.firstName),
+        `Use this code to confirm your ${data.planName ? `<strong>${escapeHtml(data.planName)}</strong>` : 'plan'} order:`,
+        `<strong style="font-size:24px;letter-spacing:4px">${escapeHtml(code)}</strong>`,
+        `The code expires in ${minutes} minutes. If you did not place this order, ignore this email.`,
+      ]),
+      text: `Your ${brand.name} order code is ${code}. It expires in ${minutes} minutes.`,
+      sms: `${code} confirms your ${brand.name} order. Valid for ${minutes} minutes.`,
+      inApp: { title: 'Order confirmation code sent', body: `A code was emailed, valid for ${minutes} minutes.`, href: null },
+    };
+  },
+
+  [NotificationEvent.ORDER_CONFIRMED]: (data) => ({
+    subject: `Your ${brand.name} order is confirmed${data.planName ? ` — ${data.planName}` : ''}`,
+    html: layout('Order confirmed', [
+      greeting(data.firstName),
+      `Thank you. Your ${data.planName ? `<strong>${escapeHtml(data.planName)}</strong>` : 'plan'} order is confirmed.`,
+      ...(data.installAddress
+        ? [`<strong>Installation address:</strong> ${escapeHtml(data.installAddress)}`]
+        : []),
+      'Our team has been notified and will contact you to schedule installation. There is no online payment — settle at the office when asked.',
+    ]),
+    text: `Your ${brand.name} order is confirmed${data.planName ? ` for ${data.planName}` : ''}. Our team will contact you to schedule installation.`,
+    sms: `Your ${brand.name} order is confirmed${data.planName ? ` for ${data.planName}` : ''}. We will contact you shortly.`,
+    inApp: {
+      title: 'Order confirmed',
+      body: data.planName ? `Your ${data.planName} order is on file.` : 'Your order is confirmed.',
+      href: '/dashboard/subscription',
+    },
+  }),
+
+  [NotificationEvent.ORDER_CONFIRMED_ADMIN]: (data) => ({
+    subject: `New confirmed order${data.planName ? ` — ${data.planName}` : ''}`,
+    html: layout('New order confirmed', [
+      'A customer confirmed an order with the emailed OTP.',
+      `<strong>Customer:</strong> ${escapeHtml(data.customerName ?? data.firstName ?? '—')}`,
+      `<strong>Email:</strong> ${escapeHtml(data.email ?? '—')}`,
+      `<strong>Phone:</strong> ${escapeHtml(data.phone ?? '—')}`,
+      `<strong>Plan:</strong> ${escapeHtml(data.planName ?? '—')}`,
+      `<strong>Installation address:</strong> ${escapeHtml(data.installAddress ?? '—')}`,
+    ]),
+    text: `New ${brand.name} order confirmed. Customer: ${data.customerName ?? '—'}. Email: ${data.email ?? '—'}. Phone: ${data.phone ?? '—'}. Plan: ${data.planName ?? '—'}. Address: ${data.installAddress ?? '—'}.`,
+    sms: `New ${brand.name} order: ${data.customerName ?? 'customer'} / ${data.phone ?? ''} / ${data.planName ?? 'a plan'} / ${data.installAddress ?? ''}`,
+    inApp: {
+      title: 'New order confirmed',
+      body: `${data.customerName ?? 'A customer'} ordered ${data.planName ?? 'a plan'}.`,
+      href: '/orders',
     },
   }),
 };

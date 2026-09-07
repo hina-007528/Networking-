@@ -36,7 +36,7 @@ const N = CoverageStatus.NOT_AVAILABLE;
  * `NOT_AVAILABLE`, because that is how a real fibre roll-out behaves and it is the case the
  * coverage checker has to handle correctly.
  */
-export const seedCities: SeedCity[] = [
+const allSeedCities: SeedCity[] = [
   {
     name: 'Karachi',
     code: 'KHI',
@@ -90,7 +90,7 @@ export const seedCities: SeedCity[] = [
     isLive: true,
     latitude: 31.5204,
     longitude: 74.3587,
-    branchAddress: '45-C, Main Boulevard, Gulberg III, Lahore',
+    branchAddress: 'H#A/1, Sheikh Hindi Manzil, Outside Bhatti Gate, Lahore.',
     areas: [
       {
         name: 'Gulberg III',
@@ -371,3 +371,6 @@ export const seedCities: SeedCity[] = [
     areas: [{ name: 'Lalazar', status: A }, { name: 'Gudwal', status: A }],
   },
 ];
+
+/** Majawar X Network serves Lahore only. Other cities stay in the source file as a reference. */
+export const seedCities: SeedCity[] = allSeedCities.filter((city) => city.name === 'Lahore');

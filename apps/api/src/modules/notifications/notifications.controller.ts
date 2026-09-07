@@ -10,7 +10,7 @@ import { CurrentUser } from '../../common/decorators/auth.decorators';
 import { ResponseMessage } from '../../common/decorators/response.decorators';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { ApiZodQuery } from '../../common/swagger/zod-swagger';
-import { type NotificationsService } from './notifications.service';
+import { NotificationsService } from './notifications.service';
 
 @ApiTags('Notifications')
 @ApiBearerAuth()

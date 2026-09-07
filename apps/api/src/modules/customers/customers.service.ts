@@ -1,17 +1,30 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { hash } from 'bcryptjs';
 import { CustomerStatus, type Prisma } from '@prisma/client';
-import type { CustomerDto } from '@stormfiber/types';
-import type { updateCustomerSchema, updateOwnProfileSchema } from '@stormfiber/validation';
+import type { CustomerDto, Paginated } from '@stormfiber/types';
+import { RoleName as Role } from '@stormfiber/types';
+import { SERVICE_CITY, SERVICE_CITY_SLUG } from '@stormfiber/config';
+import type {
+  adminCustomerListQuerySchema,
+  createCustomerSchema,
+  updateCustomerSchema,
+  updateOwnProfileSchema,
+} from '@stormfiber/validation';
 import type { z } from 'zod';
-import { AuditAction, type AuditService } from '../../common/audit/audit.service';
+import { AuditAction, AuditService } from '../../common/audit/audit.service';
+import { APP_CONFIG, type AppConfig } from '../../config/configuration';
 import type { RequestContext } from '../../common/decorators/auth.decorators';
 import { AppException } from '../../common/errors/app.exception';
-import { type Db, type PrismaService } from '../../common/prisma/prisma.service';
-import { type SequenceService } from '../../common/sequence/sequence.service';
+import { type Db, PrismaService } from '../../common/prisma/prisma.service';
+import { SequenceService } from '../../common/sequence/sequence.service';
+import { buildOrderBy, buildPaginationMeta, toPrismaPagination } from '../../common/utils/pagination';
 import { accountNumber } from '../../common/utils/references';
 import { toNumber } from '../../common/utils/money';
-import { type AuthService } from '../auth/auth.service';
+import { AuthService } from '../auth/auth.service';
 
+export type AdminCustomerListQuery = z.output<typeof adminCustomerListQuerySchema>;
+
+export type CreateCustomerPayload = z.output<typeof createCustomerSchema>;
 export type UpdateCustomerPayload = z.output<typeof updateCustomerSchema>;
 export type UpdateOwnProfilePayload = z.output<typeof updateOwnProfileSchema>;
 
@@ -48,6 +61,7 @@ export class CustomersService {
     private readonly auth: AuthService,
     private readonly sequence: SequenceService,
     private readonly audit: AuditService,
+    @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
   /** Reserves the next sequential account number. */
@@ -181,6 +195,44 @@ export class CustomersService {
     return this.toDto(row);
   }
 
+  async list(query: AdminCustomerListQuery): Promise<Paginated<CustomerDto>> {
+    const { skip, take } = toPrismaPagination(query);
+    const search = query.search?.trim();
+    const where: Prisma.CustomerWhereInput = {
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.cityId ? { cityId: query.cityId } : {}),
+      ...(query.planId ? { subscriptions: { some: { planId: query.planId } } } : {}),
+      ...(query.hasOutstanding ? { balance: { gt: 0 } } : {}),
+      ...(search
+        ? {
+            OR: [
+              { firstName: { contains: search, mode: 'insensitive' } },
+              { lastName: { contains: search, mode: 'insensitive' } },
+              { email: { contains: search, mode: 'insensitive' } },
+              { mobile: { contains: search } },
+              { accountNumber: { contains: search } },
+            ],
+          }
+        : {}),
+    };
+
+    const [rows, total] = await this.prisma.$transaction([
+      this.prisma.customer.findMany({
+        where,
+        include: customerInclude,
+        orderBy: buildOrderBy(query.sort, query.order, ['createdAt', 'updatedAt', 'lastName', 'balance'], 'createdAt'),
+        skip,
+        take,
+      }),
+      this.prisma.customer.count({ where }),
+    ]);
+
+    return {
+      items: rows.map((row) => this.toDto(row)),
+      pagination: buildPaginationMeta(query, total),
+    };
+  }
+
   /**
    * Self-service profile update.
    *
@@ -223,6 +275,104 @@ export class CustomersService {
     });
 
     return this.toDto(updated);
+  }
+
+  async adminCreate(
+    input: CreateCustomerPayload,
+    actorId: string,
+    context: RequestContext,
+  ): Promise<CustomerDto> {
+    const email = input.email.toLowerCase();
+    const clash = await this.prisma.user.findFirst({
+      where: { OR: [{ email }, { mobile: input.mobile }], deletedAt: null },
+      select: { email: true, mobile: true },
+    });
+    if (clash) {
+      throw AppException.validation([
+        clash.email === email
+          ? { field: 'email', code: 'taken', message: 'An account already uses this email address' }
+          : { field: 'mobile', code: 'taken', message: 'An account already uses this mobile number' },
+      ]);
+    }
+
+    const city = await this.prisma.city.findFirst({
+      where: { slug: SERVICE_CITY_SLUG, deletedAt: null },
+      select: { id: true },
+    });
+    if (!city) {
+      throw AppException.of('OUTSIDE_SERVICE_CITY', `${SERVICE_CITY} is not configured`, 422);
+    }
+
+    const customerRole = await this.prisma.role.findUnique({
+      where: { name: Role.CUSTOMER },
+      select: { id: true },
+    });
+    if (!customerRole) {
+      throw AppException.of('INTERNAL_ERROR', 'Customer role is not provisioned', 503);
+    }
+
+    const user = await this.prisma.user.create({
+      data: {
+        email,
+        mobile: input.mobile,
+        passwordHash: await hash(input.password, this.config.auth.bcryptRounds),
+        firstName: input.firstName,
+        lastName: input.lastName,
+        status: 'ACTIVE',
+        mobileVerifiedAt: new Date(),
+        roles: { create: { roleId: customerRole.id } },
+      },
+      select: { id: true },
+    });
+
+    const account = await this.nextAccountNumber();
+    const created = await this.prisma.customer.create({
+      data: {
+        userId: user.id,
+        accountNumber: account,
+        firstName: input.firstName,
+        lastName: input.lastName,
+        email,
+        mobile: input.mobile,
+        status: input.status,
+        cityId: city.id,
+        addressLine: input.addressLine,
+        ...(input.status === CustomerStatus.ACTIVE ? { activatedAt: new Date() } : {}),
+      },
+      include: customerInclude,
+    });
+
+    await this.audit.record({
+      userId: actorId,
+      action: AuditAction.USER_CREATED,
+      entity: 'Customer',
+      entityId: created.id,
+      newValue: { email, mobile: input.mobile, source: 'admin' },
+      context,
+    });
+
+    return this.toDto(created);
+  }
+
+  async adminDelete(customerId: string, actorId: string, context: RequestContext): Promise<void> {
+    const existing = await this.prisma.customer.findUnique({
+      where: { id: customerId },
+      select: { id: true, userId: true, email: true },
+    });
+    if (!existing) {
+      throw AppException.notFound('Customer');
+    }
+
+    await this.prisma.user.delete({ where: { id: existing.userId } });
+    await this.audit.record({
+      userId: actorId,
+      action: AuditAction.CUSTOMER_UPDATED,
+      entity: 'Customer',
+      entityId: customerId,
+      oldValue: { email: existing.email },
+      newValue: { deleted: true },
+      context,
+    });
   }
 
   /** Admin update. Status changes are recorded with their own audit action. */

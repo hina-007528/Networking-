@@ -103,3 +103,10 @@ export interface MediaAssetDto {
   altText: string | null;
   createdAt: string;
 }
+
+/** Assembled homepage payload: slides, published sections and site chrome. */
+export interface HomepageDto {
+  slides: HeroSlideDto[];
+  sections: CmsSectionDto[];
+  settings: SiteSettingsDto;
+}

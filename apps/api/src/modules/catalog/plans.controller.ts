@@ -11,7 +11,7 @@ import {
 import { Public } from '../../common/decorators/auth.decorators';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { ApiZodQuery } from '../../common/swagger/zod-swagger';
-import { type PlansService, type PlanComparePayload, type PlanFilterPayload } from './plans.service';
+import { PlansService, type PlanComparePayload, type PlanFilterPayload } from './plans.service';
 
 /**
  * Public plan catalogue.

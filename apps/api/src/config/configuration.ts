@@ -29,10 +29,12 @@ export const environmentSchema = z
     API_PORT: z.coerce.number().int().min(1).max(65535).default(4000),
     API_URL: z.string().default('http://localhost:4000'),
     API_GLOBAL_PREFIX: z.string().default('api/v1'),
-    CORS_ORIGINS: csvList.default('http://localhost:3000,http://localhost:3001'),
+    CORS_ORIGINS: csvList.default(
+      'http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001',
+    ),
     THROTTLE_TTL: z.coerce.number().int().min(1).default(60),
     THROTTLE_LIMIT: z.coerce.number().int().min(1).default(120),
-    SWAGGER_ENABLED: booleanFromEnv.default('true'),
+    SWAGGER_ENABLED: booleanFromEnv.optional(),
     BODY_LIMIT: z.string().default('1mb'),
 
     JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
@@ -53,7 +55,10 @@ export const environmentSchema = z
     OTP_PROOF_TTL_SECONDS: z.coerce.number().int().min(60).default(1800),
 
     MAIL_PROVIDER: z.enum(['console', 'smtp']).default('console'),
-    MAIL_FROM: z.string().default('StormFiber <no-reply@stormfiber.local>'),
+    MAIL_FROM: z.string().default('Majawar X Network <info@majawarxnetworks.online>'),
+    MAIL_ADMIN_INBOX: z
+      .string()
+      .default('ceo@majawarxnetworks.online,info@majawarxnetworks.online'),
     SMTP_HOST: z.string().optional(),
     SMTP_PORT: z.coerce.number().int().optional(),
     SMTP_SECURE: booleanFromEnv.default('false'),
@@ -64,6 +69,10 @@ export const environmentSchema = z
     SMS_API_URL: z.string().optional(),
     SMS_API_KEY: z.string().optional(),
     SMS_SENDER_ID: z.string().default('StormFiber'),
+
+    WHATSAPP_ADMIN: z.string().default('+923257862291'),
+    WHATSAPP_ACCESS_TOKEN: z.string().optional(),
+    WHATSAPP_PHONE_NUMBER_ID: z.string().optional(),
 
     PAYMENT_PROVIDER: z.enum(['mock', 'card', 'bank', 'wallet']).default('mock'),
     PAYMENT_SECRET: z.string().min(8).default('dev-only-webhook-signing-secret'),
@@ -183,6 +192,8 @@ export interface AppConfig {
   mail: {
     provider: Environment['MAIL_PROVIDER'];
     from: string;
+    adminInbox: string;
+    adminInboxes: string[];
     host?: string;
     port?: number;
     secure: boolean;
@@ -194,6 +205,11 @@ export interface AppConfig {
     apiUrl?: string;
     apiKey?: string;
     senderId: string;
+  };
+  whatsapp: {
+    adminNumbers: string[];
+    accessToken?: string;
+    phoneNumberId?: string;
   };
   payments: {
     provider: Environment['PAYMENT_PROVIDER'];
@@ -227,7 +243,7 @@ export function buildAppConfig(env: Environment): AppConfig {
       globalPrefix: env.API_GLOBAL_PREFIX,
       corsOrigins: env.CORS_ORIGINS,
       bodyLimit: env.BODY_LIMIT,
-      swaggerEnabled: env.SWAGGER_ENABLED,
+      swaggerEnabled: env.SWAGGER_ENABLED ?? env.NODE_ENV !== 'production',
     },
     throttle: { ttl: env.THROTTLE_TTL, limit: env.THROTTLE_LIMIT },
     auth: {
@@ -252,6 +268,10 @@ export function buildAppConfig(env: Environment): AppConfig {
     mail: {
       provider: env.MAIL_PROVIDER,
       from: env.MAIL_FROM,
+      adminInbox: env.MAIL_ADMIN_INBOX.split(',')[0]?.trim() || 'info@majawarxnetworks.online',
+      adminInboxes: env.MAIL_ADMIN_INBOX.split(',')
+        .map((entry) => entry.trim())
+        .filter((entry) => entry.includes('@')),
       host: env.SMTP_HOST,
       port: env.SMTP_PORT,
       secure: env.SMTP_SECURE,
@@ -263,6 +283,13 @@ export function buildAppConfig(env: Environment): AppConfig {
       apiUrl: env.SMS_API_URL,
       apiKey: env.SMS_API_KEY,
       senderId: env.SMS_SENDER_ID,
+    },
+    whatsapp: {
+      adminNumbers: env.WHATSAPP_ADMIN.split(',')
+        .map((entry) => entry.trim())
+        .filter(Boolean),
+      accessToken: env.WHATSAPP_ACCESS_TOKEN,
+      phoneNumberId: env.WHATSAPP_PHONE_NUMBER_ID,
     },
     payments: {
       provider: env.PAYMENT_PROVIDER,

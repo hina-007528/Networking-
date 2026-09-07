@@ -1,4 +1,4 @@
-﻿import {
+import {
   DiscountKind,
   type Prisma,
   type PrismaClient,
@@ -75,6 +75,7 @@ export async function seedCatalog(
         heroHeadline: product.heroHeadline,
         heroSubheadline: product.heroSubheadline,
         iconKey: product.iconKey,
+        imageUrl: 'imageUrl' in product ? product.imageUrl ?? null : undefined,
         status: PublishStatus.PUBLISHED,
         displayOrder: product.displayOrder,
         seoTitle: product.seoTitle,
@@ -89,6 +90,7 @@ export async function seedCatalog(
         heroHeadline: product.heroHeadline,
         heroSubheadline: product.heroSubheadline,
         iconKey: product.iconKey,
+        imageUrl: 'imageUrl' in product ? product.imageUrl ?? null : null,
         status: PublishStatus.PUBLISHED,
         displayOrder: product.displayOrder,
         seoTitle: product.seoTitle,

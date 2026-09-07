@@ -10,15 +10,18 @@ import {
 
 export const coverageCheckSchema = z
   .object({
-    cityId: uuidSchema,
+    cityId: uuidSchema.optional(),
+    cityName: z.string().trim().min(2).max(80).optional(),
     areaId: uuidSchema.optional(),
     subAreaId: uuidSchema.optional(),
     address: z.string().trim().max(255).optional(),
     mobile: mobileSchema.optional(),
+    lat: z.number().gte(-90).lte(90).optional(),
+    lng: z.number().gte(-180).lte(180).optional(),
   })
-  .refine((value) => Boolean(value.areaId ?? value.subAreaId), {
-    message: 'Select your area to check coverage',
-    path: ['areaId'],
+  .refine((value) => Boolean(value.cityId ?? value.cityName ?? (value.lat != null && value.lng != null)), {
+    message: 'Enter a city or drop a pin on the map',
+    path: ['cityName'],
   });
 
 export const coverageLeadSchema = z.object({
@@ -31,6 +34,12 @@ export const coverageLeadSchema = z.object({
   subAreaId: uuidSchema.optional(),
   address: addressSchema.optional(),
   notes: optionalMessageSchema,
+});
+
+export const cityWaitlistSchema = z.object({
+  name: nameSchema,
+  phone: mobileSchema,
+  city: z.string().trim().min(2, 'Enter your city').max(80),
 });
 
 export const callbackRequestSchema = z.object({
@@ -50,4 +59,5 @@ export const callbackRequestSchema = z.object({
 
 export type CoverageCheckInput = z.input<typeof coverageCheckSchema>;
 export type CoverageLeadInput = z.input<typeof coverageLeadSchema>;
+export type CityWaitlistInput = z.input<typeof cityWaitlistSchema>;
 export type CallbackRequestInput = z.input<typeof callbackRequestSchema>;

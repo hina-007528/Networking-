@@ -18,6 +18,29 @@ const LOG_LEVELS: Record<AppConfig['observability']['logLevel'], LogLevel[]> = {
   verbose: ['error', 'warn', 'log', 'debug', 'verbose'],
 };
 
+function isAllowedCorsOrigin(
+  origin: string | undefined,
+  allowed: string[],
+  isDevelopment: boolean,
+): boolean {
+  // Same-origin tools and server-side fetches send no Origin. Allow that only in development.
+  if (!origin) {
+    return isDevelopment;
+  }
+  if (allowed.includes(origin)) {
+    return true;
+  }
+  if (!isDevelopment) {
+    return false;
+  }
+  try {
+    const { hostname } = new URL(origin);
+    return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+  } catch {
+    return false;
+  }
+}
+
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bufferLogs: true,
@@ -56,7 +79,13 @@ async function bootstrap(): Promise<void> {
   app.use(urlencoded({ extended: true, limit: config.http.bodyLimit }));
 
   app.enableCors({
-    origin: config.http.corsOrigins,
+    origin: (origin, callback) => {
+      if (isAllowedCorsOrigin(origin, config.http.corsOrigins, config.isDevelopment)) {
+        callback(null, true);
+        return;
+      }
+      callback(new Error(`Origin ${origin} is not allowed by CORS`));
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id', 'Idempotency-Key'],

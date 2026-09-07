@@ -34,7 +34,7 @@ export class AppException extends HttpException {
   static validation(details: ApiErrorDetail[]): AppException {
     return new AppException(
       ApiErrorCode.VALIDATION_ERROR,
-      'The submitted data did not pass validation',
+      details[0]?.message ?? 'The submitted data did not pass validation',
       HttpStatus.UNPROCESSABLE_ENTITY,
       details,
     );

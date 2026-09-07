@@ -61,8 +61,6 @@ export interface OtpRequestResult {
   expiresAt: string;
   resendAvailableAt: string;
   attemptsRemaining: number;
-  /** Populated only when OTP_DEV_ECHO is enabled in a development environment. */
-  devCode?: string;
 }
 
 export interface OtpVerifyPayload {

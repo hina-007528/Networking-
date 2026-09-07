@@ -3,6 +3,8 @@ import type {
   CustomerStatus,
   InvoiceItemType,
   InvoiceStatus,
+  NotifyStatus,
+  OrderStatus,
   PaymentMethod,
   PaymentStatus,
   RefundStatus,
@@ -49,6 +51,8 @@ export interface SubscriptionDto {
   id: string;
   reference: string;
   customerId: string;
+  customerName?: string;
+  customerAccountNumber?: string;
   planId: string;
   planName: string;
   planSpeedMbps: number | null;
@@ -57,6 +61,7 @@ export interface SubscriptionDto {
   monthlyAmount: number;
   currency: string;
   cityId: string;
+  cityName?: string;
   startedAt: string | null;
   currentPeriodStart: string | null;
   currentPeriodEnd: string | null;
@@ -91,6 +96,8 @@ export interface SubscriptionChangeRequestDto {
   effectiveFrom: string | null;
   createdAt: string;
   updatedAt: string;
+  customerName?: string;
+  subscriptionReference?: string;
 }
 
 export interface InvoiceItemDto {
@@ -125,6 +132,9 @@ export interface InvoiceDto {
   items: InvoiceItemDto[];
   notes: string | null;
   pdfUrl: string | null;
+  paidMethod: string | null;
+  paidByAdminId: string | null;
+  paidByAdminName: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -187,4 +197,43 @@ export interface BillingSummaryDto {
   overdueAmount: number;
   lastPayment: PaymentDto | null;
   autoPayEnabled: boolean;
+}
+
+export interface NotificationLogDto {
+  id: string;
+  recipient: string;
+  subjectOrTag: string;
+  body: string;
+  relatedOrderId: string | null;
+  status: NotifyStatus;
+  error: string | null;
+  createdAt: string;
+}
+
+export interface OrderDto {
+  id: string;
+  customerId: string;
+  customerName: string;
+  customerEmail: string;
+  customerMobile: string;
+  planId: string;
+  planName: string;
+  planMonthlyPrice: number;
+  currency: string;
+  installAddress: string;
+  status: OrderStatus;
+  otpPending: boolean;
+  otpExpiresAt: string | null;
+  otpAttempts: number;
+  confirmedAt: string | null;
+  subscriptionId: string | null;
+  notifications: NotificationLogDto[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateOrderResult {
+  order: OrderDto;
+  expiresAt: string;
+  resendAvailableAt: string;
 }

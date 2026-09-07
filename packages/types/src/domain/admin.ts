@@ -57,6 +57,7 @@ export interface DashboardMetricsDto {
   openTickets: number;
   resolvedTickets: number;
   newLeads: number;
+  waitlistCount: number;
   currency: string;
 }
 

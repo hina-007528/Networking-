@@ -1,16 +1,19 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
-import type { NotificationDto, Paginated } from '@stormfiber/types';
-import { NotificationChannel } from '@stormfiber/types';
-import type { PaginationQuery } from '@stormfiber/validation';
+import type { NotificationDto, NotificationLogDto, Paginated } from '@stormfiber/types';
+import { NotificationChannel, NotificationEvent } from '@stormfiber/types';
+import type { adminNotificationLogQuerySchema, PaginationQuery } from '@stormfiber/validation';
+import type { z } from 'zod';
 import { APP_CONFIG, type AppConfig } from '../../config/configuration';
-import { type PrismaService } from '../../common/prisma/prisma.service';
-import { JobName, QueueName, type QueueService } from '../../common/queue/queue.service';
+import { PrismaService } from '../../common/prisma/prisma.service';
+import { JobName, QueueName, QueueService } from '../../common/queue/queue.service';
 import { AppException } from '../../common/errors/app.exception';
 import { buildPaginationMeta, toPrismaPagination } from '../../common/utils/pagination';
 import { MAIL_PROVIDER, type MailProvider } from './providers/mail.provider';
 import { SMS_PROVIDER, type SmsProvider } from './providers/sms.provider';
 import { renderNotification, type TemplateData } from './notification-templates';
+
+export type AdminNotificationLogQuery = z.output<typeof adminNotificationLogQuerySchema>;
 
 export interface DispatchInput {
   userId: string;
@@ -190,12 +193,17 @@ export class NotificationsService {
     to: { email?: string | null; mobile?: string | null },
   ): Promise<void> {
     const rendered = renderNotification(event, data);
+    const emailOnlySecret = event === NotificationEvent.OTP_REQUESTED;
 
-    if (to.mobile) {
+    if (to.mobile && !emailOnlySecret) {
       const result = await this.sms.send({ to: to.mobile, body: rendered.sms });
       if (!result.delivered) {
         this.logger.warn(`Transient SMS for ${event} failed: ${result.error ?? 'unknown'}`);
       }
+    }
+
+    if (emailOnlySecret && !to.email) {
+      this.logger.warn(`OTP requested without an email address; code was not delivered`);
     }
 
     if (to.email) {
@@ -295,5 +303,173 @@ export class NotificationsService {
   /** Exposes the configured OTP echo flag so the auth module does not read config twice. */
   get devEchoEnabled(): boolean {
     return this.config.otp.devEcho && !this.config.isProduction;
+  }
+
+  /**
+   * Sends an email and writes a NotificationLog row for every attempt.
+   *
+   * OTP codes must never be passed in `body` — that column is visible to support staff.
+   */
+  async sendEmail(input: {
+    to: string;
+    subject: string;
+    html: string;
+    text: string;
+    tag?: string;
+    relatedOrderId?: string | null;
+    logBody: string;
+  }): Promise<{ delivered: boolean; logId: string }> {
+    const result = await this.mail.send({
+      to: input.to,
+      subject: input.subject,
+      html: input.html,
+      text: input.text,
+    });
+
+    const log = await this.prisma.notificationLog.create({
+      data: {
+        recipient: input.to,
+        subjectOrTag: input.tag ?? input.subject,
+        body: input.logBody,
+        relatedOrderId: input.relatedOrderId ?? null,
+        status: result.delivered ? 'SENT' : 'FAILED',
+        error: result.delivered ? null : (result.error ?? 'Delivery failed'),
+      },
+      select: { id: true },
+    });
+
+    if (!result.delivered) {
+      this.logger.warn(`sendEmail to ${input.to} failed: ${result.error ?? 'unknown'}`);
+    }
+
+    return { delivered: result.delivered, logId: log.id };
+  }
+
+  get adminInbox(): string {
+    return this.config.mail.adminInbox;
+  }
+
+  get adminInboxes(): string[] {
+    return this.config.mail.adminInboxes.length > 0
+      ? this.config.mail.adminInboxes
+      : [this.config.mail.adminInbox];
+  }
+
+  get adminMobiles(): string[] {
+    return this.config.whatsapp.adminNumbers;
+  }
+
+  async sendSms(input: {
+    to: string;
+    body: string;
+    tag?: string;
+    relatedOrderId?: string | null;
+    logBody: string;
+  }): Promise<{ delivered: boolean; logId: string }> {
+    const result = await this.sms.send({ to: input.to, body: input.body });
+    const log = await this.prisma.notificationLog.create({
+      data: {
+        recipient: input.to,
+        subjectOrTag: input.tag ?? 'SMS',
+        body: input.logBody,
+        relatedOrderId: input.relatedOrderId ?? null,
+        status: result.delivered ? 'SENT' : 'FAILED',
+        error: result.delivered ? null : (result.error ?? 'Delivery failed'),
+      },
+      select: { id: true },
+    });
+    return { delivered: result.delivered, logId: log.id };
+  }
+
+  async sendWhatsApp(input: {
+    to: string;
+    body: string;
+    tag?: string;
+    relatedOrderId?: string | null;
+    logBody: string;
+  }): Promise<{ delivered: boolean; logId: string }> {
+    const result = await this.dispatchWhatsApp(input.to, input.body);
+    const log = await this.prisma.notificationLog.create({
+      data: {
+        recipient: input.to,
+        subjectOrTag: input.tag ?? 'WHATSAPP',
+        body: input.logBody,
+        relatedOrderId: input.relatedOrderId ?? null,
+        status: result.delivered ? 'SENT' : 'FAILED',
+        error: result.delivered ? null : (result.error ?? 'Delivery failed'),
+      },
+      select: { id: true },
+    });
+    return { delivered: result.delivered, logId: log.id };
+  }
+
+  private async dispatchWhatsApp(
+    to: string,
+    body: string,
+  ): Promise<{ delivered: boolean; error?: string }> {
+    const { accessToken, phoneNumberId } = this.config.whatsapp;
+    if (accessToken && phoneNumberId) {
+      try {
+        const digits = to.replace(/\D/g, '');
+        const response = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
+          method: 'POST',
+          headers: {
+            authorization: `Bearer ${accessToken}`,
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            messaging_product: 'whatsapp',
+            to: digits,
+            type: 'text',
+            text: { body },
+          }),
+        });
+        if (!response.ok) {
+          const reason = `WhatsApp Cloud API responded with ${response.status}`;
+          this.logger.warn(reason);
+          return { delivered: false, error: reason };
+        }
+        return { delivered: true };
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : 'WhatsApp delivery failed';
+        this.logger.warn(reason);
+        return { delivered: false, error: reason };
+      }
+    }
+
+    const sms = await this.sms.send({ to, body });
+    return { delivered: sms.delivered, error: sms.error };
+  }
+
+  async listLogs(query: AdminNotificationLogQuery): Promise<Paginated<NotificationLogDto>> {
+    const { skip, take } = toPrismaPagination(query);
+    const where: Prisma.NotificationLogWhereInput = {
+      ...(query.relatedOrderId ? { relatedOrderId: query.relatedOrderId } : {}),
+      ...(query.status ? { status: query.status } : {}),
+    };
+
+    const [rows, total] = await this.prisma.$transaction([
+      this.prisma.notificationLog.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take,
+      }),
+      this.prisma.notificationLog.count({ where }),
+    ]);
+
+    return {
+      items: rows.map((row) => ({
+        id: row.id,
+        recipient: row.recipient,
+        subjectOrTag: row.subjectOrTag,
+        body: row.body,
+        relatedOrderId: row.relatedOrderId,
+        status: row.status,
+        error: row.error,
+        createdAt: row.createdAt.toISOString(),
+      })),
+      pagination: buildPaginationMeta(query, total),
+    };
   }
 }

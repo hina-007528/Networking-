@@ -1,8 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
-import { type PrismaService } from '../prisma/prisma.service';
+import type { AuditLogDto, Paginated } from '@stormfiber/types';
+import type { adminAuditListQuerySchema } from '@stormfiber/validation';
+import type { z } from 'zod';
+import { PrismaService } from '../prisma/prisma.service';
 import type { RequestContext } from '../decorators/auth.decorators';
+import { buildPaginationMeta, toPrismaPagination } from '../utils/pagination';
 import { redact } from '../utils/redaction';
+
+export type AdminAuditListQuery = z.output<typeof adminAuditListQuerySchema>;
 
 /** Canonical audit actions. Using constants keeps the admin filter list honest. */
 export const AuditAction = {
@@ -82,5 +88,59 @@ export class AuditService {
         error instanceof Error ? error.stack : undefined,
       );
     }
+  }
+
+  async list(query: AdminAuditListQuery): Promise<Paginated<AuditLogDto>> {
+    const { skip, take } = toPrismaPagination(query);
+    const where: Prisma.AuditLogWhereInput = {
+      ...(query.userId ? { userId: query.userId } : {}),
+      ...(query.entity ? { entity: query.entity } : {}),
+      ...(query.action ? { action: { contains: query.action, mode: 'insensitive' } } : {}),
+      ...(query.from || query.to
+        ? {
+            createdAt: {
+              ...(query.from ? { gte: query.from } : {}),
+              ...(query.to ? { lte: query.to } : {}),
+            },
+          }
+        : {}),
+      ...(query.search
+        ? {
+            OR: [
+              { action: { contains: query.search, mode: 'insensitive' } },
+              { entity: { contains: query.search, mode: 'insensitive' } },
+              { entityId: { contains: query.search } },
+            ],
+          }
+        : {}),
+    };
+
+    const [rows, total] = await this.prisma.$transaction([
+      this.prisma.auditLog.findMany({
+        where,
+        include: { user: { select: { firstName: true, lastName: true } } },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take,
+      }),
+      this.prisma.auditLog.count({ where }),
+    ]);
+
+    return {
+      items: rows.map((row) => ({
+        id: row.id,
+        userId: row.userId,
+        userName: row.user ? `${row.user.firstName} ${row.user.lastName}` : null,
+        action: row.action,
+        entity: row.entity,
+        entityId: row.entityId,
+        oldValue: (row.oldValue as Record<string, unknown> | null) ?? null,
+        newValue: (row.newValue as Record<string, unknown> | null) ?? null,
+        ipAddress: row.ipAddress,
+        userAgent: row.userAgent,
+        createdAt: row.createdAt.toISOString(),
+      })),
+      pagination: buildPaginationMeta(query, total),
+    };
   }
 }

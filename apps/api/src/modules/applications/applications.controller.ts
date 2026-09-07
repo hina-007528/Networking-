@@ -11,7 +11,7 @@ import { Ctx, Public, type RequestContext } from '../../common/decorators/auth.d
 import { ResponseMessage } from '../../common/decorators/response.decorators';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { ApiEnvelope, ApiErrorEnvelope, ApiZodBody, ApiZodQuery } from '../../common/swagger/zod-swagger';
-import { type ApplicationsService, type CreateApplicationPayload } from './applications.service';
+import { ApplicationsService, type CreateApplicationPayload } from './applications.service';
 
 @ApiTags('Applications')
 @Controller('applications')

@@ -2,7 +2,7 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { DiscountKind, type Prisma, TaxKind, TaxTarget } from '@prisma/client';
 import type { PriceBreakdownLine, PriceQuoteDto } from '@stormfiber/types';
 import { AppException } from '../../common/errors/app.exception';
-import { type PrismaService } from '../../common/prisma/prisma.service';
+import { PrismaService } from '../../common/prisma/prisma.service';
 import { money, percentOf, roundMoney, sum, toNumber, ZERO, type Money } from '../../common/utils/money';
 
 export interface QuoteRequest {
