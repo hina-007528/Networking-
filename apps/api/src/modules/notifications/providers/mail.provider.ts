@@ -110,6 +110,38 @@ export class ResendMailProvider implements MailProvider {
       return { delivered: false, providerRef: null, error: 'RESEND_API_KEY is not set' };
     }
 
+    const fromAddresses = [
+      this.config.mail.from,
+      'Majawar X Network <beth.t@example.com>',
+    ].filter((value, index, list) => list.indexOf(value) === index);
+
+    let lastError = 'Resend request failed';
+    for (const from of fromAddresses) {
+      const result = await this.dispatch(apiKey, from, message);
+      if (result.delivered) {
+        if (from.includes('resend.dev')) {
+          this.logger.warn(
+            `Sent via Resend onboarding domain. Verify majawarxnetworks.online at https://resend.com/domains to use ${this.config.mail.from}`,
+          );
+        }
+        return result;
+      }
+      lastError = result.error ?? lastError;
+      const unverified = /domain is not verified/i.test(lastError);
+      if (!unverified) {
+        break;
+      }
+    }
+
+    this.logger.error(`Resend delivery to ${message.to} failed: ${lastError}`);
+    return { delivered: false, providerRef: null, error: lastError };
+  }
+
+  private async dispatch(
+    apiKey: string,
+    from: string,
+    message: MailMessage,
+  ): Promise<MailDeliveryResult> {
     try {
       const response = await fetch('https://api.resend.com/emails', {
         method: 'POST',
@@ -118,7 +150,7 @@ export class ResendMailProvider implements MailProvider {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          from: this.config.mail.from,
+          from,
           to: [message.to],
           subject: message.subject,
           html: message.html,
@@ -127,16 +159,20 @@ export class ResendMailProvider implements MailProvider {
       });
       const payload = (await response.json()) as { id?: string; message?: string; name?: string };
       if (!response.ok) {
-        const reason = payload.message ?? payload.name ?? `Resend HTTP ${response.status}`;
-        this.logger.error(`Resend delivery to ${message.to} failed: ${reason}`);
-        return { delivered: false, providerRef: null, error: reason };
+        return {
+          delivered: false,
+          providerRef: null,
+          error: payload.message ?? payload.name ?? `Resend HTTP ${response.status}`,
+        };
       }
-      this.logger.log(`Resend accepted mail to ${message.to} (${payload.id ?? 'no-id'})`);
+      this.logger.log(`Resend accepted mail to ${message.to} from ${from} (${payload.id ?? 'no-id'})`);
       return { delivered: true, providerRef: payload.id ?? null };
     } catch (error) {
-      const reason = error instanceof Error ? error.message : 'Unknown Resend error';
-      this.logger.error(`Resend delivery to ${message.to} failed: ${reason}`);
-      return { delivered: false, providerRef: null, error: reason };
+      return {
+        delivered: false,
+        providerRef: null,
+        error: error instanceof Error ? error.message : 'Unknown Resend error',
+      };
     }
   }
 }
