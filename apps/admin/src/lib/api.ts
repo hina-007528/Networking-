@@ -104,7 +104,7 @@ async function request<T>(path: string, init: RequestInit): Promise<T> {
 
 function unreachableApiError(): ApiClientError {
   return new ApiClientError(
-    `Cannot reach the API at ${API_BASE}. Start it with npm run dev -w @stormfiber/api.`,
+    `Cannot reach the API at ${API_BASE}. Check that the API is running and that this site origin is allowed in CORS.`,
     'INTERNAL_ERROR',
     0,
   );

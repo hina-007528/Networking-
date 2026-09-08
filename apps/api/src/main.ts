@@ -30,15 +30,25 @@ function isAllowedCorsOrigin(
   if (allowed.includes(origin)) {
     return true;
   }
-  if (!isDevelopment) {
-    return false;
-  }
   try {
-    const { hostname } = new URL(origin);
-    return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+    const { hostname, protocol } = new URL(origin);
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') {
+      return isDevelopment;
+    }
+    if (protocol !== 'https:') {
+      return false;
+    }
+    if (hostname === 'majawarxnetworks.online' || hostname.endsWith('.majawarxnetworks.online')) {
+      return true;
+    }
+    // Vercel production and preview URLs for this repo (admin + site).
+    if (hostname === 'networking-admin.vercel.app' || hostname.endsWith('.vercel.app')) {
+      return hostname.includes('networking');
+    }
   } catch {
     return false;
   }
+  return false;
 }
 
 async function bootstrap(): Promise<void> {

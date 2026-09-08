@@ -31,7 +31,16 @@ export const environmentSchema = z
     API_URL: z.string().default('http://localhost:4000'),
     API_GLOBAL_PREFIX: z.string().default('api/v1'),
     CORS_ORIGINS: csvList.default(
-      'http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001',
+      [
+        'http://localhost:3000',
+        'http://localhost:3001',
+        'http://127.0.0.1:3000',
+        'http://127.0.0.1:3001',
+        'https://networking-admin.vercel.app',
+        'https://www.majawarxnetworks.online',
+        'https://majawarxnetworks.online',
+        'https://admin.majawarxnetworks.online',
+      ].join(','),
     ),
     THROTTLE_TTL: z.coerce.number().int().min(1).default(60),
     THROTTLE_LIMIT: z.coerce.number().int().min(1).default(120),
