@@ -58,11 +58,18 @@ export class SmtpMailProvider implements MailProvider {
   private getTransporter(): Transporter {
     if (!this.transporter) {
       const { host, port, secure, user, password } = this.config.mail;
+      const smtpPort = port ?? (secure ? 465 : 587);
+      const useTls = secure || smtpPort === 465;
       this.transporter = createTransport({
         host,
-        port: port ?? (secure ? 465 : 587),
-        secure,
+        port: smtpPort,
+        secure: useTls,
+        family: 4,
+        connectionTimeout: 20_000,
+        greetingTimeout: 20_000,
+        socketTimeout: 30_000,
         auth: user && password ? { user, pass: password } : undefined,
+        tls: { minVersion: 'TLSv1.2' },
       });
     }
 
@@ -71,14 +78,20 @@ export class SmtpMailProvider implements MailProvider {
 
   async send(message: MailMessage): Promise<MailDeliveryResult> {
     try {
-      const info = await this.getTransporter().sendMail({
+      const transporter = this.getTransporter();
+      const info = await transporter.sendMail({
         from: this.config.mail.from,
+        envelope: this.config.mail.user
+          ? { from: this.config.mail.user, to: message.to }
+          : undefined,
         to: message.to,
         subject: message.subject,
         text: message.text,
         html: message.html,
+        replyTo: this.config.mail.user || undefined,
       });
 
+      this.logger.log(`SMTP accepted mail to ${message.to} (${info.messageId ?? 'no-id'})`);
       return { delivered: true, providerRef: info.messageId ?? null };
     } catch (error) {
       const reason = error instanceof Error ? error.message : 'Unknown SMTP error';
