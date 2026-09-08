@@ -1,6 +1,7 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import type { FormEvent } from 'react';
+import { useEffect, useState } from 'react';
 import type { PermissionDto, RoleDto } from '@stormfiber/types';
 import { FormError, FormSuccess } from '@/components/form-field';
 import { apiGet, apiSend } from '@/lib/api';

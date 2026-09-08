@@ -1,6 +1,7 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import type { FormEvent } from 'react';
+import { useEffect, useState } from 'react';
 import type { CallbackRequestDto, Paginated } from '@stormfiber/types';
 import { FormError, FormSuccess, SelectInput } from '@/components/form-field';
 import { apiGet, apiSend, readItems } from '@/lib/api';

@@ -1,6 +1,7 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import type { FormEvent } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { formatCurrency } from '@stormfiber/config';
 import type { ApplicationDto } from '@stormfiber/types';

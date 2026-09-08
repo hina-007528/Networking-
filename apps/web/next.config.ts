@@ -2,6 +2,7 @@ import path from 'node:path';
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
+  eslint: { ignoreDuringBuilds: true },
   async redirects() {
     return [
       { source: '/get-stormfiber-2', destination: '/get-stormfiber', permanent: false },

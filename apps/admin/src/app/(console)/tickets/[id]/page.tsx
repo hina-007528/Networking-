@@ -1,6 +1,7 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import type { FormEvent } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import type { TicketDto } from '@stormfiber/types';
 import { Field, FormError, FormSuccess, SelectInput, TextInput } from '@/components/form-field';

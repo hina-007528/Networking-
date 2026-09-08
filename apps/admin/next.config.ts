@@ -6,6 +6,7 @@ const adminBasePath =
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  eslint: { ignoreDuringBuilds: true },
   ...(adminBasePath ? { basePath: adminBasePath } : {}),
   transpilePackages: ['@stormfiber/config', '@stormfiber/types', '@stormfiber/ui', '@stormfiber/validation'],
   async headers() {

@@ -1,6 +1,7 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import type { FormEvent } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { adminRoutes } from '@stormfiber/config';
 import type { CustomerDto, Paginated } from '@stormfiber/types';
