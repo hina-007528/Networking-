@@ -26,6 +26,7 @@ export const environmentSchema = z
     DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
     REDIS_URL: z.string().default('redis://localhost:6379'),
 
+    PORT: z.coerce.number().int().min(1).max(65535).optional(),
     API_PORT: z.coerce.number().int().min(1).max(65535).default(4000),
     API_URL: z.string().default('http://localhost:4000'),
     API_GLOBAL_PREFIX: z.string().default('api/v1'),
@@ -238,7 +239,7 @@ export function buildAppConfig(env: Environment): AppConfig {
     isProduction: env.NODE_ENV === 'production',
     isDevelopment: env.NODE_ENV === 'development',
     http: {
-      port: env.API_PORT,
+      port: env.PORT ?? env.API_PORT,
       url: env.API_URL,
       globalPrefix: env.API_GLOBAL_PREFIX,
       corsOrigins: env.CORS_ORIGINS,

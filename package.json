@@ -29,7 +29,8 @@
     "db:studio": "pnpm --filter @stormfiber/api prisma:studio",
     "docker:dev": "docker compose -f docker-compose.dev.yml up -d",
     "docker:dev:down": "docker compose -f docker-compose.dev.yml down",
-    "docker:prod": "docker compose up -d --build"
+    "docker:prod": "docker compose up -d --build",
+    "build:api:render": "npx --workspace=@stormfiber/api prisma generate && npx --workspace=@stormfiber/api prisma migrate deploy && npm run build -w @stormfiber/api"
   },
   "dependencies": {
     "pnpm": "^12.3.4",
