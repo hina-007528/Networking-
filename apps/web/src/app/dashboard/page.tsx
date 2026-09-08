@@ -30,9 +30,9 @@ export default function DashboardHomePage() {
       apiGet<CustomerDto>('/customer/profile'),
       apiGet<SubscriptionDto | null>('/customer/subscription'),
       apiGet<BillingSummaryDto>('/customer/invoices/summary'),
-      apiGet<Paginated<InvoiceDto>>('/customer/invoices?pageSize=4').catch(() => ({ items: [] as InvoiceDto[] })),
-      apiGet<Paginated<TicketDto>>('/tickets?pageSize=4').catch(() => ({ items: [] as TicketDto[] })),
-      apiGet<Paginated<NotificationDto>>('/notifications?pageSize=4').catch(() => ({ items: [] as NotificationDto[] })),
+      apiGet<Paginated<InvoiceDto>>('/customer/invoices?pageSize=4').catch(() => [] as InvoiceDto[]),
+      apiGet<Paginated<TicketDto>>('/tickets?pageSize=4').catch(() => [] as TicketDto[]),
+      apiGet<Paginated<NotificationDto>>('/notifications?pageSize=4').catch(() => [] as NotificationDto[]),
     ])
       .then(([nextProfile, nextSubscription, nextBilling, invoicePage, ticketPage, noticePage]) => {
         if (cancelled) return;

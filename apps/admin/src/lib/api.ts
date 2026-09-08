@@ -54,7 +54,7 @@ export function persistSession(session: AuthSessionDto): void {
   setAccessToken(session.tokens.accessToken);
 }
 
-export function readItems<T>(payload: Paginated<T> | T[] | null | undefined): T[] {
+export function readItems<T>(payload: Paginated<T> | { items: T[] } | T[] | null | undefined): T[] {
   if (!payload) return [];
   if (Array.isArray(payload)) return payload;
   return Array.isArray(payload.items) ? payload.items : [];
@@ -104,7 +104,7 @@ async function request<T>(path: string, init: RequestInit): Promise<T> {
 
 function unreachableApiError(): ApiClientError {
   return new ApiClientError(
-    `Cannot reach the API at ${API_BASE}. Start it with pnpm --filter @stormfiber/api dev.`,
+    `Cannot reach the API at ${API_BASE}. Start it with npm run dev -w @stormfiber/api.`,
     'INTERNAL_ERROR',
     0,
   );

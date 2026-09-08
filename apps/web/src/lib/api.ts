@@ -1,6 +1,6 @@
 import type { ApiResponse, AuthSessionDto, Paginated } from '@stormfiber/types';
 
-export function readItems<T>(payload: Paginated<T> | T[] | null | undefined): T[] {
+export function readItems<T>(payload: Paginated<T> | { items: T[] } | T[] | null | undefined): T[] {
   if (!payload) return [];
   if (Array.isArray(payload)) return payload;
   return Array.isArray(payload.items) ? payload.items : [];

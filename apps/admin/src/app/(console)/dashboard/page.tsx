@@ -60,7 +60,7 @@ export default function DashboardPage() {
     Promise.all([
       apiGet<DashboardMetricsDto>('/admin/analytics/dashboard'),
       apiGet<DashboardChartsDto>('/admin/analytics/charts?days=30'),
-      apiGet<Paginated<TicketDto>>('/admin/tickets?page=1&pageSize=6').catch(() => ({ items: [] as TicketDto[] })),
+      apiGet<Paginated<TicketDto>>('/admin/tickets?page=1&pageSize=6').catch(() => [] as TicketDto[]),
     ])
       .then(([nextMetrics, nextCharts, ticketPage]) => {
         if (cancelled) return;
