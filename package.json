@@ -4,7 +4,7 @@
   "private": true,
   "description": "Production-grade ISP platform: public website, customer portal, admin console and API",
   "engines": {
-    "node": ">=20.11.0"
+    "node": "24.x"
   },
   "packageManager": "npm@10.8.2",
   "workspaces": [
