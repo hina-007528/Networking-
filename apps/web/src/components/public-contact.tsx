@@ -16,7 +16,7 @@ export function PublicContact({ className = '', tone = 'light' }: PublicContactP
 
   const phones = [
     { label: 'Phone', href: `tel:${brand.supportPhoneE164}`, value: brand.supportPhoneDisplay },
-    { label: 'WhatsApp', href: `tel:${brand.whatsappE164}`, value: brand.whatsappDisplay },
+    { label: 'WhatsApp', href: brand.whatsappUrl, value: brand.whatsappDisplay },
   ];
   const emails = [
     { label: 'Email', href: `mailto:${brand.officeEmail}`, value: brand.officeEmail },
@@ -29,7 +29,11 @@ export function PublicContact({ className = '', tone = 'light' }: PublicContactP
         {phones.map((item) => (
           <article key={item.label} className={card}>
             <p className={`text-xs font-bold uppercase tracking-wider ${label}`}>{item.label}</p>
-            <a className={`mt-2 block text-sm font-semibold break-all ${value}`} href={item.href}>
+            <a
+              className={`mt-2 block text-sm font-semibold break-all ${value}`}
+              href={item.href}
+              {...(item.label === 'WhatsApp' ? { target: '_blank', rel: 'noreferrer' } : {})}
+            >
               {item.value}
             </a>
           </article>

@@ -81,7 +81,7 @@ export const environmentSchema = z
     SMS_API_KEY: z.string().optional(),
     SMS_SENDER_ID: z.string().default('StormFiber'),
 
-    WHATSAPP_ADMIN: z.string().default('+923257862291'),
+    WHATSAPP_ADMIN: z.string().default('+923030002291'),
     WHATSAPP_ACCESS_TOKEN: z.string().optional(),
     WHATSAPP_PHONE_NUMBER_ID: z.string().optional(),
 

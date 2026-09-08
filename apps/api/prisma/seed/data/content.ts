@@ -461,7 +461,7 @@ export const seedSiteSettings = {
     href: '/offers/monsoon-surge',
   },
   socialLinks: [
-    { platform: 'whatsapp', url: 'https://wa.me/923257862291' },
+    { platform: 'whatsapp', url: 'https://wa.me/923030002291' },
     { platform: 'instagram', url: 'https://www.instagram.com/majawar_x_network?igsi=bDVhMmF1bmpkOGdo' },
     { platform: 'linkedin', url: 'https://www.linkedin.com/company/majawar-x-networks/' },
   ],
