@@ -83,6 +83,7 @@ export default function GetConnectionPage() {
   const [submitted, setSubmitted] = useState<ApplicationDto | null>(null);
   const [resendAvailableAt, setResendAvailableAt] = useState(0);
   const [clock, setClock] = useState(() => Date.now());
+  const [otpAttempted, setOtpAttempted] = useState(false);
 
   useEffect(() => {
     apiGet<CityDto[]>('/cities')
@@ -163,12 +164,24 @@ export default function GetConnectionPage() {
     setLoading(true);
     setError(null);
     try {
-      const path = kind === 'resend' ? apiRoutes.authOtpResend : apiRoutes.authOtpRequest;
-      const otp = await apiSend<OtpRequestResult>(path, {
+      const payload = {
         mobile: state.mobile,
-        purpose: 'APPLICATION',
+        purpose: 'APPLICATION' as const,
         email: state.email,
-      });
+      };
+      let otp: OtpRequestResult;
+      try {
+        otp = await apiSend<OtpRequestResult>(
+          kind === 'resend' ? apiRoutes.authOtpResend : apiRoutes.authOtpRequest,
+          payload,
+        );
+      } catch (caught) {
+        if (!(caught instanceof ApiClientError) || caught.status !== 404 || kind !== 'resend') {
+          throw caught;
+        }
+        otp = await apiSend<OtpRequestResult>(apiRoutes.authOtpRequest, payload);
+      }
+      setOtpAttempted(true);
       patch({ requestId: otp.requestId });
       setResendAvailableAt(new Date(otp.resendAvailableAt).getTime());
       setHint(
@@ -177,6 +190,7 @@ export default function GetConnectionPage() {
           : `A 6-digit code was emailed to ${state.email}. Check inbox and spam.`,
       );
     } catch (caught) {
+      setOtpAttempted(true);
       applyOtpCooldown(caught);
       setError(caught instanceof Error ? caught.message : 'Could not send the verification code');
     } finally {
@@ -345,37 +359,37 @@ export default function GetConnectionPage() {
 
         {step === 1 ? (
           <form className="space-y-6" onSubmit={state.verificationToken ? (event) => { event.preventDefault(); next(); } : verifyOtp}>
-            {!state.requestId ? (
-              <div className="text-center py-6">
-                <p className="mb-6 text-sm text-[#5d6b7a]">We will email a 6-digit verification code to <strong className="text-[#1b2430]">{state.email}</strong>.</p>
-                <button type="button" onClick={() => void requestOtp('send')} disabled={loading || resendWaitSeconds > 0} className="sf-btn sf-btn-primary">
-                  {loading ? 'Sending Verification Code…' : 'Send Verification Code'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void requestOtp('resend')}
-                  disabled={loading || resendWaitSeconds > 0}
-                  className="mt-3 block w-full text-sm font-semibold text-[#2E86DE] disabled:text-[#9CA3AF]"
-                >
-                  {resendWaitSeconds > 0 ? `Resend OTP in ${resendWaitSeconds}s` : 'Resend OTP'}
-                </button>
-              </div>
-            ) : (
+            <p className="text-sm text-[#5d6b7a]">
+              We will email a 6-digit verification code to <strong className="text-[#1b2430]">{state.email}</strong>.
+            </p>
+            {state.requestId ? (
               <>
                 <FormSuccess message={hint} />
                 <Field label="6-Digit Verification Code">
                   <TextInput name="code" required inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="123456" />
                 </Field>
-                <button
-                  type="button"
-                  onClick={() => void requestOtp('resend')}
-                  disabled={loading || resendWaitSeconds > 0}
-                  className="sf-btn sf-btn-outline w-full justify-center text-sm font-semibold disabled:opacity-60"
-                >
-                  {resendWaitSeconds > 0 ? `Resend OTP in ${resendWaitSeconds}s` : loading ? 'Sending…' : 'Resend OTP'}
-                </button>
-                <WizardActions loading={loading} onBack={() => setStep(0)} />
               </>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => void requestOtp(otpAttempted || state.requestId ? 'resend' : 'send')}
+              disabled={loading || resendWaitSeconds > 0}
+              className="sf-btn sf-btn-primary w-full justify-center disabled:opacity-60"
+            >
+              {loading
+                ? 'Sending…'
+                : resendWaitSeconds > 0
+                  ? `Resend OTP in ${resendWaitSeconds}s`
+                  : otpAttempted || state.requestId
+                    ? 'Resend OTP'
+                    : 'Send OTP'}
+            </button>
+            {state.requestId ? (
+              <WizardActions loading={loading} onBack={() => setStep(0)} submitLabel="Verify code" />
+            ) : (
+              <button type="button" onClick={() => setStep(0)} className="sf-btn sf-btn-outline">
+                Back
+              </button>
             )}
           </form>
         ) : null}

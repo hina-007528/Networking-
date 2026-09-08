@@ -33,6 +33,7 @@ function RegisterWizard() {
   const [hint, setHint] = useState<string | null>(null);
   const [resendAvailableAt, setResendAvailableAt] = useState(0);
   const [clock, setClock] = useState(() => Date.now());
+  const [otpAttempted, setOtpAttempted] = useState(false);
   const [form, setForm] = useState({
     firstName: '',
     lastName: '',
@@ -128,20 +129,33 @@ function RegisterWizard() {
     try {
       const mobile = mobileSchema.parse(form.mobile);
       patch({ mobile });
-      const path = kind === 'resend' ? apiRoutes.authOtpResend : apiRoutes.authOtpRequest;
-      const otp = await apiSend<OtpRequestResult>(path, {
+      const payload = {
         mobile,
-        purpose: 'REGISTRATION',
+        purpose: 'REGISTRATION' as const,
         email: emailSchema.parse(form.email),
-      });
+      };
+      let otp: OtpRequestResult;
+      try {
+        otp = await apiSend<OtpRequestResult>(
+          kind === 'resend' ? apiRoutes.authOtpResend : apiRoutes.authOtpRequest,
+          payload,
+        );
+      } catch (caught) {
+        if (!(caught instanceof ApiClientError) || caught.status !== 404 || kind !== 'resend') {
+          throw caught;
+        }
+        otp = await apiSend<OtpRequestResult>(apiRoutes.authOtpRequest, payload);
+      }
+      setOtpAttempted(true);
       patch({ requestId: otp.requestId });
       setResendAvailableAt(new Date(otp.resendAvailableAt).getTime());
       setHint(
         kind === 'resend'
           ? `A new 6-digit code was emailed to ${form.email}. Previous codes no longer work. Check inbox and spam.`
-          : `A 6-digit code was emailed to ${form.email}. Check inbox and spam. If it is not there, wait for the timer and tap Resend OTP.`,
+          : `A 6-digit code was emailed to ${form.email}. Check inbox and spam.`,
       );
     } catch (caught) {
+      setOtpAttempted(true);
       applyOtpCooldown(caught);
       setError(caught instanceof Error ? caught.message : 'Could not send the verification code');
     } finally {
@@ -309,10 +323,31 @@ function RegisterWizard() {
               }}
             >
               <Field label="Email" htmlFor="email">
-                <input id="email" type="email" className="sf-input" value={form.email} onChange={(e) => patch({ email: e.target.value, requestId: '', verificationToken: '' })} required />
+                <input
+                  id="email"
+                  type="email"
+                  className="sf-input"
+                  value={form.email}
+                  onChange={(e) => {
+                    setOtpAttempted(false);
+                    patch({ email: e.target.value, requestId: '', verificationToken: '' });
+                  }}
+                  required
+                />
               </Field>
               <Field label="Mobile" htmlFor="mobile">
-                <input id="mobile" type="tel" className="sf-input" placeholder="03XXXXXXXXX" value={form.mobile} onChange={(e) => patch({ mobile: e.target.value, requestId: '', verificationToken: '' })} required />
+                <input
+                  id="mobile"
+                  type="tel"
+                  className="sf-input"
+                  placeholder="03XXXXXXXXX"
+                  value={form.mobile}
+                  onChange={(e) => {
+                    setOtpAttempted(false);
+                    patch({ mobile: e.target.value, requestId: '', verificationToken: '' });
+                  }}
+                  required
+                />
               </Field>
               <Field label="City" htmlFor="city">
                 <input id="city" className="sf-input bg-[#F3F7FC]" value={SERVICE_CITY} readOnly />
@@ -326,25 +361,26 @@ function RegisterWizard() {
               <WizardError message={error} />
               <div className="flex gap-3">
                 <button type="button" className="sf-btn sf-btn-outline" onClick={() => { setError(null); setStep(0); }}>Back</button>
-                <button type="submit" disabled={loading} className="sf-btn sf-btn-primary flex-1 justify-center">
-                  {loading ? 'Working…' : form.requestId ? 'Verify code' : 'Send OTP'}
+                <button
+                  type="button"
+                  disabled={loading || resendWaitSeconds > 0}
+                  className="sf-btn sf-btn-primary flex-1 justify-center disabled:opacity-60"
+                  onClick={() => void requestOtp(otpAttempted || form.requestId ? 'resend' : 'send')}
+                >
+                  {loading
+                    ? 'Sending…'
+                    : resendWaitSeconds > 0
+                      ? `Resend OTP in ${resendWaitSeconds}s`
+                      : otpAttempted || form.requestId
+                        ? 'Resend OTP'
+                        : 'Send OTP'}
                 </button>
               </div>
-              <button
-                type="button"
-                disabled={loading || resendWaitSeconds > 0}
-                className="sf-btn sf-btn-outline w-full justify-center disabled:text-[#9CA3AF]"
-                onClick={() => void requestOtp(form.requestId ? 'resend' : 'send')}
-              >
-                {resendWaitSeconds > 0
-                  ? `Resend OTP in ${resendWaitSeconds}s`
-                  : form.requestId
-                    ? 'Resend OTP'
-                    : 'Send OTP again'}
-              </button>
-              <p className="text-center text-xs text-[#6B7280]">
-                Didn’t get the email? Check spam, then resend. Each new code replaces the previous one.
-              </p>
+              {form.requestId ? (
+                <button type="submit" disabled={loading} className="sf-btn sf-btn-outline w-full justify-center">
+                  {loading ? 'Working…' : 'Verify code'}
+                </button>
+              ) : null}
             </form>
           ) : null}
 

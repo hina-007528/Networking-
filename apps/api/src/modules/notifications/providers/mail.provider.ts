@@ -23,6 +23,28 @@ export interface MailProvider {
 
 export const MAIL_PROVIDER = 'MAIL_PROVIDER';
 
+const RESEND_ONBOARDING_FROM = 'Majawar X Network <beth.t@example.com>';
+
+/** Uses SMTP first, then Resend HTTPS if SMTP is blocked (typical on Render free). */
+export class FallbackMailProvider implements MailProvider {
+  readonly name = 'fallback';
+  private readonly logger = new Logger(FallbackMailProvider.name);
+
+  constructor(
+    private readonly primary: MailProvider,
+    private readonly secondary: MailProvider,
+  ) {}
+
+  async send(message: MailMessage): Promise<MailDeliveryResult> {
+    const first = await this.primary.send(message);
+    if (first.delivered) return first;
+    this.logger.warn(
+      `${this.primary.name} failed (${first.error ?? 'unknown'}); trying ${this.secondary.name}`,
+    );
+    return this.secondary.send(message);
+  }
+}
+
 /** Development transport: logs the message instead of sending it. */
 @Injectable()
 export class ConsoleMailProvider implements MailProvider {
@@ -110,10 +132,9 @@ export class ResendMailProvider implements MailProvider {
       return { delivered: false, providerRef: null, error: 'RESEND_API_KEY is not set' };
     }
 
-    const fromAddresses = [
-      this.config.mail.from,
-      'Majawar X Network <beth.t@example.com>',
-    ].filter((value, index, list) => list.indexOf(value) === index);
+    const fromAddresses = [this.config.mail.from, RESEND_ONBOARDING_FROM].filter(
+      (value, index, list) => list.indexOf(value) === index,
+    );
 
     let lastError = 'Resend request failed';
     for (const from of fromAddresses) {

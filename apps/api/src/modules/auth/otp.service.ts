@@ -122,7 +122,7 @@ export class OtpService {
     if (!delivery.delivered) {
       throw AppException.of(
         'INTERNAL_ERROR',
-        'We could not send the verification email. Check spam, then tap Resend OTP. If it still fails, email is not configured on the server.',
+        otpMailFailureMessage(delivery.error),
         HttpStatus.BAD_GATEWAY,
       );
     }
@@ -353,4 +353,21 @@ export class OtpService {
 
     return result.count;
   }
+}
+
+function otpMailFailureMessage(error?: string): string {
+  const reason = (error ?? '').trim();
+  if (/domain is not verified/i.test(reason)) {
+    return 'The sending domain is not verified in Resend yet. Add only the TXT and CNAME records Resend shows — do not change Hostinger MX. Until it is Verified, codes can only be delivered to the Gmail used for the Resend account. Then tap Resend OTP.';
+  }
+  if (/RESEND_API_KEY/i.test(reason)) {
+    return 'Email is not configured on the server. Set MAIL_PROVIDER=resend and RESEND_API_KEY on Render, then tap Resend OTP.';
+  }
+  if (/ECONNREFUSED|ETIMEDOUT|timeout|SMTP|blocked|EHOSTUNREACH/i.test(reason)) {
+    return 'The server could not send mail over SMTP (Render blocks those ports). Set MAIL_PROVIDER=resend and RESEND_API_KEY, then tap Resend OTP.';
+  }
+  if (reason) {
+    return `We could not send the verification email (${reason}). Check spam, then tap Resend OTP.`;
+  }
+  return 'We could not send the verification email. Check spam, then tap Resend OTP.';
 }

@@ -2,6 +2,7 @@ import { Global, Module, type Provider } from '@nestjs/common';
 import { APP_CONFIG, type AppConfig } from '../../config/configuration';
 import {
   ConsoleMailProvider,
+  FallbackMailProvider,
   MAIL_PROVIDER,
   type MailProvider,
   ResendMailProvider,
@@ -24,8 +25,17 @@ const mailProvider: Provider = {
   provide: MAIL_PROVIDER,
   inject: [APP_CONFIG],
   useFactory: (config: AppConfig): MailProvider => {
-    if (config.mail.provider === 'smtp') return new SmtpMailProvider(config);
-    if (config.mail.provider === 'resend') return new ResendMailProvider(config);
+    const resend = config.mail.resendApiKey ? new ResendMailProvider(config) : null;
+    if (config.mail.provider === 'resend') {
+      return resend ?? new ConsoleMailProvider();
+    }
+    if (config.mail.provider === 'smtp') {
+      const smtp = new SmtpMailProvider(config);
+      return resend ? new FallbackMailProvider(smtp, resend) : smtp;
+    }
+    if (resend && process.env.NODE_ENV === 'production') {
+      return resend;
+    }
     return new ConsoleMailProvider();
   },
 };
