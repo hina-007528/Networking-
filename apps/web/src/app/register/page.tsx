@@ -3,12 +3,12 @@
 import { type FormEvent, type ReactNode, Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { brand, dashboardRoutes, publicRoutes, SERVICE_CITY } from '@stormfiber/config';
+import { apiRoutes, brand, dashboardRoutes, publicRoutes, SERVICE_CITY } from '@stormfiber/config';
 import type { CityDto, OtpRequestResult, OtpVerifyResult, PlanDto } from '@stormfiber/types';
 import { emailSchema, mobileSchema, nameSchema, passwordSchema, registerApiSchema } from '@stormfiber/validation';
 import { BrandLogo } from '@/components/brand-logo';
 import { PasswordInput } from '@/components/password-input';
-import { apiGet, apiSend } from '@/lib/api';
+import { ApiClientError, apiGet, apiSend } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 
 const STEPS = ['Personal', 'Verify contact', 'Credentials'] as const;
@@ -111,7 +111,13 @@ function RegisterWizard() {
     return null;
   }
 
-  async function requestOtp() {
+  function applyOtpCooldown(caught: unknown) {
+    if (!(caught instanceof ApiClientError) || caught.code !== 'OTP_COOLDOWN') return;
+    const seconds = Number(caught.message.match(/(\d+)\s+seconds/)?.[1]);
+    if (seconds > 0) setResendAvailableAt(Date.now() + seconds * 1000);
+  }
+
+  async function requestOtp(kind: 'send' | 'resend' = 'send') {
     const problem = validateStep2Contact();
     if (problem) {
       setError(problem);
@@ -122,7 +128,8 @@ function RegisterWizard() {
     try {
       const mobile = mobileSchema.parse(form.mobile);
       patch({ mobile });
-      const otp = await apiSend<OtpRequestResult>('/auth/otp/request', {
+      const path = kind === 'resend' ? apiRoutes.authOtpResend : apiRoutes.authOtpRequest;
+      const otp = await apiSend<OtpRequestResult>(path, {
         mobile,
         purpose: 'REGISTRATION',
         email: emailSchema.parse(form.email),
@@ -130,9 +137,12 @@ function RegisterWizard() {
       patch({ requestId: otp.requestId });
       setResendAvailableAt(new Date(otp.resendAvailableAt).getTime());
       setHint(
-        `A 6-digit code was emailed to ${form.email}. Check inbox and spam. If it is not there, wait a minute and tap Resend code.`,
+        kind === 'resend'
+          ? `A new 6-digit code was emailed to ${form.email}. Previous codes no longer work. Check inbox and spam.`
+          : `A 6-digit code was emailed to ${form.email}. Check inbox and spam. If it is not there, wait for the timer and tap Resend OTP.`,
       );
     } catch (caught) {
+      applyOtpCooldown(caught);
       setError(caught instanceof Error ? caught.message : 'Could not send the verification code');
     } finally {
       setLoading(false);
@@ -147,7 +157,7 @@ function RegisterWizard() {
     setLoading(true);
     setError(null);
     try {
-      const verified = await apiSend<OtpVerifyResult>('/auth/otp/verify', {
+      const verified = await apiSend<OtpVerifyResult>(apiRoutes.authOtpVerify, {
         requestId: form.requestId,
         code,
       });
@@ -320,16 +330,21 @@ function RegisterWizard() {
                   {loading ? 'Working…' : form.requestId ? 'Verify code' : 'Send OTP'}
                 </button>
               </div>
-              {form.requestId ? (
-                <button
-                  type="button"
-                  disabled={loading || resendWaitSeconds > 0}
-                  className="w-full text-center text-sm font-semibold text-[#2E86DE] disabled:text-[#9CA3AF]"
-                  onClick={() => void requestOtp()}
-                >
-                  {resendWaitSeconds > 0 ? `Resend code in ${resendWaitSeconds}s` : 'Resend code'}
-                </button>
-              ) : null}
+              <button
+                type="button"
+                disabled={loading || resendWaitSeconds > 0}
+                className="sf-btn sf-btn-outline w-full justify-center disabled:text-[#9CA3AF]"
+                onClick={() => void requestOtp(form.requestId ? 'resend' : 'send')}
+              >
+                {resendWaitSeconds > 0
+                  ? `Resend OTP in ${resendWaitSeconds}s`
+                  : form.requestId
+                    ? 'Resend OTP'
+                    : 'Send OTP again'}
+              </button>
+              <p className="text-center text-xs text-[#6B7280]">
+                Didn’t get the email? Check spam, then resend. Each new code replaces the previous one.
+              </p>
             </form>
           ) : null}
 

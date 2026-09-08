@@ -68,6 +68,22 @@ export class AuthController {
     return this.otp.request(body, context);
   }
 
+  @Post('otp/resend')
+  @Public()
+  @Throttle({ default: { limit: 5, ttl: 300_000 } })
+  @ResponseMessage('Verification code resent')
+  @ApiOperation({ summary: 'Email a replacement one-time verification code' })
+  @ApiZodBody(otpRequestSchema)
+  @ApiEnvelope(HttpStatus.CREATED, 'Code resent')
+  @ApiErrorEnvelope(HttpStatus.TOO_MANY_REQUESTS, 'Cooldown or hourly limit reached', 'OTP_COOLDOWN')
+  resendOtp(
+    @Body(new ZodValidationPipe(otpRequestSchema))
+    body: { mobile: string; purpose: OtpRequestResult['purpose']; email?: string },
+    @Ctx() context: RequestContext,
+  ): Promise<OtpRequestResult> {
+    return this.otp.resend(body, context);
+  }
+
   @Post('otp/verify')
   @Public()
   @Throttle({ default: { limit: 10, ttl: 300_000 } })

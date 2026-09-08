@@ -56,22 +56,55 @@ export class OtpService {
       ipAddress: context?.ipAddress,
     });
 
+    return this.issueAndDeliver(input, context);
+  }
+
+  /** Issues a replacement code for the same contact, invalidating unused earlier codes. */
+  async resend(
+    input: { mobile: string; purpose: OtpPurpose; email?: string },
+    context: RequestContext | null,
+  ): Promise<OtpRequestResult> {
+    if (
+      (input.purpose === 'REGISTRATION' || input.purpose === 'APPLICATION') &&
+      !input.email
+    ) {
+      throw AppException.of(
+        'VALIDATION_ERROR',
+        'Enter your email so we can send the confirmation code',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const previous = await this.prisma.otpRequest.findFirst({
+      where: { mobile: input.mobile, purpose: input.purpose },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true },
+    });
+
+    if (!previous) {
+      return this.request(input, context);
+    }
+
+    await this.enforceCooldown(input.mobile, input.purpose, {
+      email: input.email,
+      ipAddress: context?.ipAddress,
+    });
+
+    this.logger.log(`OTP resend for ${input.purpose} ${input.mobile}`);
+    return this.issueAndDeliver(input, context);
+  }
+
+  /**
+   * Emails the code first, then persists it. A failed send does not create a row, so the user can
+   * tap Resend immediately instead of waiting out a cooldown for a code they never received.
+   */
+  private async issueAndDeliver(
+    input: { mobile: string; purpose: OtpPurpose; email?: string },
+    context: RequestContext | null,
+  ): Promise<OtpRequestResult> {
     const code = this.generateCode();
     const now = Date.now();
     const expiresAt = new Date(now + this.config.otp.ttlSeconds * 1000);
-
-    const record = await this.prisma.otpRequest.create({
-      data: {
-        mobile: input.mobile,
-        email: input.email ?? null,
-        purpose: input.purpose,
-        codeHash: this.hash(code),
-        maxAttempts: this.config.otp.maxAttempts,
-        expiresAt,
-        ipAddress: context?.ipAddress ?? null,
-      },
-      select: { id: true, createdAt: true },
-    });
 
     const delivery = await this.notifications
       .sendTransient(
@@ -89,12 +122,35 @@ export class OtpService {
     if (!delivery.delivered) {
       throw AppException.of(
         'INTERNAL_ERROR',
-        'We could not send the verification email. Wait a minute and tap Resend code, and check spam. If it still fails, email is not configured on the server.',
+        'We could not send the verification email. Check spam, then tap Resend OTP. If it still fails, email is not configured on the server.',
         HttpStatus.BAD_GATEWAY,
       );
     }
 
-    const result: OtpRequestResult = {
+    await this.prisma.otpRequest.updateMany({
+      where: {
+        mobile: input.mobile,
+        purpose: input.purpose,
+        consumedAt: null,
+        verifiedAt: null,
+      },
+      data: { expiresAt: new Date(now - 1) },
+    });
+
+    const record = await this.prisma.otpRequest.create({
+      data: {
+        mobile: input.mobile,
+        email: input.email ?? null,
+        purpose: input.purpose,
+        codeHash: this.hash(code),
+        maxAttempts: this.config.otp.maxAttempts,
+        expiresAt,
+        ipAddress: context?.ipAddress ?? null,
+      },
+      select: { id: true, createdAt: true },
+    });
+
+    return {
       requestId: record.id,
       mobile: input.mobile,
       purpose: input.purpose,
@@ -104,8 +160,6 @@ export class OtpService {
       ).toISOString(),
       attemptsRemaining: this.config.otp.maxAttempts,
     };
-
-    return result;
   }
 
   /**
@@ -127,10 +181,12 @@ export class OtpService {
     if (latest) {
       const elapsed = Date.now() - latest.createdAt.getTime();
       if (elapsed < cooldownMs) {
+        const retryAfterSeconds = Math.ceil((cooldownMs - elapsed) / 1000);
         throw AppException.of(
           'OTP_COOLDOWN',
-          `Please wait ${Math.ceil((cooldownMs - elapsed) / 1000)} seconds before requesting another code`,
+          `Please wait ${retryAfterSeconds} seconds before requesting another code`,
           HttpStatus.TOO_MANY_REQUESTS,
+          [{ field: 'retryAfterSeconds', message: String(retryAfterSeconds) }],
         );
       }
     }

@@ -191,6 +191,7 @@ export const apiRoutes = {
   authRefresh: '/auth/refresh',
   authMe: '/auth/me',
   authOtpRequest: '/auth/otp/request',
+  authOtpResend: '/auth/otp/resend',
   authOtpVerify: '/auth/otp/verify',
   authForgotPassword: '/auth/forgot-password',
   authResetPassword: '/auth/reset-password',

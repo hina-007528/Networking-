@@ -2,7 +2,7 @@
 
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { formatCurrency, formatMonthlyPrice, publicRoutes } from '@stormfiber/config';
+import { apiRoutes, formatCurrency, formatMonthlyPrice, publicRoutes } from '@stormfiber/config';
 import type {
   ApplicationDto,
   AreaDto,
@@ -17,7 +17,7 @@ import type {
   SubAreaDto,
 } from '@stormfiber/types';
 import { Field, FormError, FormSuccess, SelectInput, TextArea, TextInput } from '@/components/form-field';
-import { apiGet, apiSend } from '@/lib/api';
+import { ApiClientError, apiGet, apiSend } from '@/lib/api';
 
 const STEPS = ['Personal', 'Verify', 'Location', 'Services', 'Plan', 'Add-ons', 'Submit'] as const;
 
@@ -81,6 +81,8 @@ export default function GetConnectionPage() {
   const [addons, setAddons] = useState<PlanAddonDto[]>([]);
   const [quote, setQuote] = useState<PriceQuoteDto | null>(null);
   const [submitted, setSubmitted] = useState<ApplicationDto | null>(null);
+  const [resendAvailableAt, setResendAvailableAt] = useState(0);
+  const [clock, setClock] = useState(() => Date.now());
 
   useEffect(() => {
     apiGet<CityDto[]>('/cities')
@@ -129,6 +131,14 @@ export default function GetConnectionPage() {
       .catch(() => setAddons([]));
   }, [step, state.planId, plans]);
 
+  useEffect(() => {
+    if (!resendAvailableAt) return;
+    const timer = window.setInterval(() => setClock(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [resendAvailableAt]);
+
+  const resendWaitSeconds = Math.max(0, Math.ceil((resendAvailableAt - clock) / 1000));
+
   const selectedPlan = useMemo(
     () => plans.find((plan) => plan.id === state.planId) ?? null,
     [plans, state.planId],
@@ -143,19 +153,31 @@ export default function GetConnectionPage() {
     setStep((current) => Math.min(current + 1, STEPS.length - 1));
   }
 
-  async function requestOtp() {
+  function applyOtpCooldown(caught: unknown) {
+    if (!(caught instanceof ApiClientError) || caught.code !== 'OTP_COOLDOWN') return;
+    const seconds = Number(caught.message.match(/(\d+)\s+seconds/)?.[1]);
+    if (seconds > 0) setResendAvailableAt(Date.now() + seconds * 1000);
+  }
+
+  async function requestOtp(kind: 'send' | 'resend' = 'send') {
     setLoading(true);
     setError(null);
     try {
-      const otp = await apiSend<OtpRequestResult>('/auth/otp/request', {
+      const path = kind === 'resend' ? apiRoutes.authOtpResend : apiRoutes.authOtpRequest;
+      const otp = await apiSend<OtpRequestResult>(path, {
         mobile: state.mobile,
         purpose: 'APPLICATION',
         email: state.email,
       });
       patch({ requestId: otp.requestId });
-      setHint(state.email ? `A 6-digit code was emailed to ${state.email}.` : 'A 6-digit code was sent. Check your email.');
-      next();
+      setResendAvailableAt(new Date(otp.resendAvailableAt).getTime());
+      setHint(
+        kind === 'resend'
+          ? `A new 6-digit code was emailed to ${state.email}. Previous codes no longer work.`
+          : `A 6-digit code was emailed to ${state.email}. Check inbox and spam.`,
+      );
     } catch (caught) {
+      applyOtpCooldown(caught);
       setError(caught instanceof Error ? caught.message : 'Could not send the verification code');
     } finally {
       setLoading(false);
@@ -168,7 +190,7 @@ export default function GetConnectionPage() {
     setLoading(true);
     setError(null);
     try {
-      const verified = await apiSend<OtpVerifyResult>('/auth/otp/verify', {
+      const verified = await apiSend<OtpVerifyResult>(apiRoutes.authOtpVerify, {
         requestId: state.requestId,
         code: String(form.get('code') ?? ''),
       });
@@ -326,8 +348,16 @@ export default function GetConnectionPage() {
             {!state.requestId ? (
               <div className="text-center py-6">
                 <p className="mb-6 text-sm text-[#5d6b7a]">We will email a 6-digit verification code to <strong className="text-[#1b2430]">{state.email}</strong>.</p>
-                <button type="button" onClick={requestOtp} disabled={loading} className="sf-btn sf-btn-primary">
+                <button type="button" onClick={() => void requestOtp('send')} disabled={loading || resendWaitSeconds > 0} className="sf-btn sf-btn-primary">
                   {loading ? 'Sending Verification Code…' : 'Send Verification Code'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void requestOtp('resend')}
+                  disabled={loading || resendWaitSeconds > 0}
+                  className="mt-3 block w-full text-sm font-semibold text-[#2E86DE] disabled:text-[#9CA3AF]"
+                >
+                  {resendWaitSeconds > 0 ? `Resend OTP in ${resendWaitSeconds}s` : 'Resend OTP'}
                 </button>
               </div>
             ) : (
@@ -336,6 +366,14 @@ export default function GetConnectionPage() {
                 <Field label="6-Digit Verification Code">
                   <TextInput name="code" required inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="123456" />
                 </Field>
+                <button
+                  type="button"
+                  onClick={() => void requestOtp('resend')}
+                  disabled={loading || resendWaitSeconds > 0}
+                  className="sf-btn sf-btn-outline w-full justify-center text-sm font-semibold disabled:opacity-60"
+                >
+                  {resendWaitSeconds > 0 ? `Resend OTP in ${resendWaitSeconds}s` : loading ? 'Sending…' : 'Resend OTP'}
+                </button>
                 <WizardActions loading={loading} onBack={() => setStep(0)} />
               </>
             )}
