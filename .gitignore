@@ -23,16 +23,19 @@ out/
 npm-debug.log*
 pnpm-debug.log*
 
-# testing
-coverage/
+# testing (package-level reports only — not apps/api/src/modules/coverage)
+/coverage/
+apps/*/coverage/
+packages/*/coverage/
 playwright-report/
 test-results/
 blob-report/
 .playwright/
 
-# storage (local uploads)
-storage/
-!storage/.gitkeep
+# local file uploads (not apps/api/src/modules/storage)
+/storage/
+apps/api/storage/
+!/storage/.gitkeep
 
 # generated prisma client
 apps/api/generated/
