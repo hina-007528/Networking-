@@ -30,6 +30,16 @@ export class ConsoleMailProvider implements MailProvider {
   private readonly logger = new Logger(ConsoleMailProvider.name);
 
   async send(message: MailMessage): Promise<MailDeliveryResult> {
+    if (process.env.NODE_ENV === 'production') {
+      this.logger.error(
+        `MAIL_PROVIDER=console in production; OTP/email to ${message.to} was not sent`,
+      );
+      return {
+        delivered: false,
+        providerRef: null,
+        error: 'Email is not configured on the server (set MAIL_PROVIDER=smtp)',
+      };
+    }
     this.logger.log(
       `[email → ${message.to}] ${redactSecrets(message.subject)}\n${redactSecrets(message.text)}`,
     );

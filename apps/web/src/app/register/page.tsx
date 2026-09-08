@@ -31,6 +31,8 @@ function RegisterWizard() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hint, setHint] = useState<string | null>(null);
+  const [resendAvailableAt, setResendAvailableAt] = useState(0);
+  const [clock, setClock] = useState(() => Date.now());
   const [form, setForm] = useState({
     firstName: '',
     lastName: '',
@@ -76,6 +78,14 @@ function RegisterWizard() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!resendAvailableAt) return;
+    const timer = window.setInterval(() => setClock(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [resendAvailableAt]);
+
+  const resendWaitSeconds = Math.max(0, Math.ceil((resendAvailableAt - clock) / 1000));
+
   const progress = useMemo(() => ((step + 1) / STEPS.length) * 100, [step]);
 
   function validateStep1(): string | null {
@@ -118,7 +128,10 @@ function RegisterWizard() {
         email: emailSchema.parse(form.email),
       });
       patch({ requestId: otp.requestId });
-      setHint(`A 6-digit code was emailed to ${form.email}. Check your inbox.`);
+      setResendAvailableAt(new Date(otp.resendAvailableAt).getTime());
+      setHint(
+        `A 6-digit code was emailed to ${form.email}. Check inbox and spam. If it is not there, wait a minute and tap Resend code.`,
+      );
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Could not send the verification code');
     } finally {
@@ -307,6 +320,16 @@ function RegisterWizard() {
                   {loading ? 'Working…' : form.requestId ? 'Verify code' : 'Send OTP'}
                 </button>
               </div>
+              {form.requestId ? (
+                <button
+                  type="button"
+                  disabled={loading || resendWaitSeconds > 0}
+                  className="w-full text-center text-sm font-semibold text-[#2E86DE] disabled:text-[#9CA3AF]"
+                  onClick={() => void requestOtp()}
+                >
+                  {resendWaitSeconds > 0 ? `Resend code in ${resendWaitSeconds}s` : 'Resend code'}
+                </button>
+              ) : null}
             </form>
           ) : null}
 

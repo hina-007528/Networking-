@@ -73,7 +73,7 @@ export class OtpService {
       select: { id: true, createdAt: true },
     });
 
-    void this.notifications
+    const delivery = await this.notifications
       .sendTransient(
         NotificationEvent.OTP_REQUESTED,
         { code, expiryMinutes: Math.round(this.config.otp.ttlSeconds / 60) },
@@ -83,7 +83,16 @@ export class OtpService {
         this.logger.warn(
           `OTP delivery for ${input.mobile} failed: ${error instanceof Error ? error.message : 'unknown'}`,
         );
+        return { delivered: false, error: error instanceof Error ? error.message : 'unknown' };
       });
+
+    if (!delivery.delivered) {
+      throw AppException.of(
+        'INTERNAL_ERROR',
+        'We could not send the verification email. Wait a minute and tap Resend code, and check spam. If it still fails, email is not configured on the server.',
+        HttpStatus.BAD_GATEWAY,
+      );
+    }
 
     const result: OtpRequestResult = {
       requestId: record.id,

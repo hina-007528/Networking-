@@ -191,7 +191,7 @@ export class NotificationsService {
     event: string,
     data: TemplateData,
     to: { email?: string | null; mobile?: string | null },
-  ): Promise<void> {
+  ): Promise<{ delivered: boolean; error?: string }> {
     const rendered = renderNotification(event, data);
     const emailOnlySecret = event === NotificationEvent.OTP_REQUESTED;
 
@@ -204,6 +204,7 @@ export class NotificationsService {
 
     if (emailOnlySecret && !to.email) {
       this.logger.warn(`OTP requested without an email address; code was not delivered`);
+      return { delivered: false, error: 'Enter your email so we can send the confirmation code' };
     }
 
     if (to.email) {
@@ -215,8 +216,12 @@ export class NotificationsService {
       });
       if (!result.delivered) {
         this.logger.warn(`Transient email for ${event} failed: ${result.error ?? 'unknown'}`);
+        return { delivered: false, error: result.error ?? 'Email could not be sent' };
       }
+      return { delivered: true };
     }
+
+    return { delivered: true };
   }
 
   async listForUser(
