@@ -23,9 +23,9 @@ function isAllowedCorsOrigin(
   allowed: string[],
   isDevelopment: boolean,
 ): boolean {
-  // Same-origin tools and server-side fetches send no Origin. Allow that only in development.
+  // Health checks, curl, and document navigations send no Origin. CORS only applies to browsers.
   if (!origin) {
-    return isDevelopment;
+    return true;
   }
   if (allowed.includes(origin)) {
     return true;
