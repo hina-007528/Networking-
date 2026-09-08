@@ -30,7 +30,8 @@
     "docker:dev": "docker compose -f docker-compose.dev.yml up -d",
     "docker:dev:down": "docker compose -f docker-compose.dev.yml down",
     "docker:prod": "docker compose up -d --build",
-    "build:api:render": "node scripts/render-api-build.cjs"
+    "build:api:render": "node scripts/render-api-build.cjs",
+    "install:render": "npm install --include=dev"
   },
   "dependencies": {
     "pnpm": "^12.3.4",
