@@ -64,12 +64,7 @@ export class SmtpMailProvider implements MailProvider {
         host,
         port: smtpPort,
         secure: useTls,
-        family: 4,
-        connectionTimeout: 20_000,
-        greetingTimeout: 20_000,
-        socketTimeout: 30_000,
         auth: user && password ? { user, pass: password } : undefined,
-        tls: { minVersion: 'TLSv1.2' },
       });
     }
 
