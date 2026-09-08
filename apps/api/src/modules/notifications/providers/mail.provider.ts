@@ -100,3 +100,48 @@ export class SmtpMailProvider implements MailProvider {
     }
   }
 }
+
+/** HTTPS API — works on Render free tier, which blocks SMTP ports 465/587. */
+@Injectable()
+export class ResendMailProvider implements MailProvider {
+  readonly name = 'resend';
+  private readonly logger = new Logger(ResendMailProvider.name);
+
+  constructor(@Inject(APP_CONFIG) private readonly config: AppConfig) {}
+
+  async send(message: MailMessage): Promise<MailDeliveryResult> {
+    const apiKey = this.config.mail.resendApiKey;
+    if (!apiKey) {
+      return { delivered: false, providerRef: null, error: 'RESEND_API_KEY is not set' };
+    }
+
+    try {
+      const response = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: this.config.mail.from,
+          to: [message.to],
+          subject: message.subject,
+          html: message.html,
+          text: message.text,
+        }),
+      });
+      const payload = (await response.json()) as { id?: string; message?: string; name?: string };
+      if (!response.ok) {
+        const reason = payload.message ?? payload.name ?? `Resend HTTP ${response.status}`;
+        this.logger.error(`Resend delivery to ${message.to} failed: ${reason}`);
+        return { delivered: false, providerRef: null, error: reason };
+      }
+      this.logger.log(`Resend accepted mail to ${message.to} (${payload.id ?? 'no-id'})`);
+      return { delivered: true, providerRef: payload.id ?? null };
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : 'Unknown Resend error';
+      this.logger.error(`Resend delivery to ${message.to} failed: ${reason}`);
+      return { delivered: false, providerRef: null, error: reason };
+    }
+  }
+}

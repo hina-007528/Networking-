@@ -4,6 +4,7 @@ import {
   ConsoleMailProvider,
   MAIL_PROVIDER,
   type MailProvider,
+  ResendMailProvider,
   SmtpMailProvider,
 } from './providers/mail.provider';
 import {
@@ -22,8 +23,11 @@ import { NotificationsService } from './notifications.service';
 const mailProvider: Provider = {
   provide: MAIL_PROVIDER,
   inject: [APP_CONFIG],
-  useFactory: (config: AppConfig): MailProvider =>
-    config.mail.provider === 'smtp' ? new SmtpMailProvider(config) : new ConsoleMailProvider(),
+  useFactory: (config: AppConfig): MailProvider => {
+    if (config.mail.provider === 'smtp') return new SmtpMailProvider(config);
+    if (config.mail.provider === 'resend') return new ResendMailProvider(config);
+    return new ConsoleMailProvider();
+  },
 };
 
 const smsProvider: Provider = {

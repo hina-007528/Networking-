@@ -64,7 +64,7 @@ export const environmentSchema = z
     OTP_DEV_ECHO: booleanFromEnv.default('false'),
     OTP_PROOF_TTL_SECONDS: z.coerce.number().int().min(60).default(1800),
 
-    MAIL_PROVIDER: z.enum(['console', 'smtp']).default('console'),
+    MAIL_PROVIDER: z.enum(['console', 'smtp', 'resend']).default('console'),
     MAIL_FROM: z.string().default('Majawar X Network <info@majawarxnetworks.online>'),
     MAIL_ADMIN_INBOX: z
       .string()
@@ -74,6 +74,7 @@ export const environmentSchema = z
     SMTP_SECURE: booleanFromEnv.default('false'),
     SMTP_USER: z.string().optional(),
     SMTP_PASSWORD: z.string().optional(),
+    RESEND_API_KEY: z.string().optional(),
 
     SMS_PROVIDER: z.enum(['console', 'http']).default('console'),
     SMS_API_URL: z.string().optional(),
@@ -128,6 +129,13 @@ export const environmentSchema = z
           code: z.ZodIssueCode.custom,
           path: ['SMTP_HOST'],
           message: 'SMTP_HOST is required when MAIL_PROVIDER is smtp',
+        });
+      }
+      if (env.MAIL_PROVIDER === 'resend' && !env.RESEND_API_KEY) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['RESEND_API_KEY'],
+          message: 'RESEND_API_KEY is required when MAIL_PROVIDER is resend',
         });
       }
       if (env.PAYMENT_PROVIDER !== 'mock' && (!env.PAYMENT_API_URL || !env.PAYMENT_API_KEY)) {
@@ -209,6 +217,7 @@ export interface AppConfig {
     secure: boolean;
     user?: string;
     password?: string;
+    resendApiKey?: string;
   };
   sms: {
     provider: Environment['SMS_PROVIDER'];
@@ -287,6 +296,7 @@ export function buildAppConfig(env: Environment): AppConfig {
       secure: env.SMTP_SECURE,
       user: env.SMTP_USER,
       password: env.SMTP_PASSWORD,
+      resendApiKey: env.RESEND_API_KEY,
     },
     sms: {
       provider: env.SMS_PROVIDER,
