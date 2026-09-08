@@ -57,9 +57,9 @@ export default function CustomersPage() {
   const counts = useMemo(
     () => ({
       ACTIVE: customers.filter((c) => c.status === 'ACTIVE').length,
-      PROSPECT: customers.filter((c) => c.status === 'PROSPECT' || c.status === 'PENDING').length,
+      PROSPECT: customers.filter((c) => c.status === 'PROSPECT').length,
       SUSPENDED: customers.filter((c) => c.status === 'SUSPENDED').length,
-      CHURNED: customers.filter((c) => c.status === 'CHURNED' || c.status === 'TERMINATED').length,
+      CHURNED: customers.filter((c) => c.status === 'CHURNED').length,
     }),
     [customers],
   );
