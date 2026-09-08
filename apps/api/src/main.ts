@@ -35,11 +35,11 @@ function isAllowedCorsOrigin(
     if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') {
       return isDevelopment;
     }
+    if (hostname === 'majawarxnetworks.online' || hostname.endsWith('.majawarxnetworks.online')) {
+      return protocol === 'https:' || protocol === 'http:';
+    }
     if (protocol !== 'https:') {
       return false;
-    }
-    if (hostname === 'majawarxnetworks.online' || hostname.endsWith('.majawarxnetworks.online')) {
-      return true;
     }
     // Vercel production and preview URLs for this repo (admin + site).
     if (hostname === 'networking-admin.vercel.app' || hostname.endsWith('.vercel.app')) {
