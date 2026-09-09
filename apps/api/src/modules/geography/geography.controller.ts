@@ -19,7 +19,7 @@ export class GeographyController {
 
   @Get('cities')
   @Public()
-  @ApiOperation({ summary: 'Cities where StormFiber operates or is expanding' })
+  @ApiOperation({ summary: 'Cities where Majawar X Network operates or is expanding' })
   listCities(): Promise<CityDto[]> {
     return this.geography.listCities();
   }

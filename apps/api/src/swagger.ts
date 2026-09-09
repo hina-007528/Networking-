@@ -12,10 +12,10 @@ export function setupSwagger(app: INestApplication, config: AppConfig): void {
   const document = SwaggerModule.createDocument(
     app,
     new DocumentBuilder()
-      .setTitle('StormFiber Platform API')
+      .setTitle('Majawar X Network Platform API')
       .setDescription(
         [
-          'REST API behind the StormFiber website, customer portal and admin console.',
+          'REST API behind the Majawar X Network website, customer portal and admin console.',
           '',
           'Every response uses a fixed envelope: `{ success, data, message }` on success and',
           '`{ success: false, error: { code, message, details } }` on failure. Clients should',
@@ -55,6 +55,6 @@ export function setupSwagger(app: INestApplication, config: AppConfig): void {
       operationsSorter: 'alpha',
       docExpansion: 'none',
     },
-    customSiteTitle: 'StormFiber API',
+    customSiteTitle: 'Majawar X Network API'
   });
 }

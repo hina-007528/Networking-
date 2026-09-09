@@ -88,7 +88,7 @@ export function MobileNavigation({
                 ))
               : null}
             <Link href={publicRoutes.getConnection} className="py-3" onClick={() => setOpen(false)}>
-              Get Majawar X
+              Get Majawar X Network
             </Link>
             <Link href={publicRoutes.checkAvailability} className="py-3" onClick={() => setOpen(false)}>
               Check Availability

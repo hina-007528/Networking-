@@ -50,7 +50,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
         )}
         <div className="mt-12 flex flex-wrap gap-3">
           <Link href={publicRoutes.getConnection} className="sf-btn sf-btn-primary">
-            Get Majawar X
+            Get Majawar X Network
           </Link>
           <Link href={publicRoutes.plans} className="sf-btn sf-btn-outline">
             Check plans

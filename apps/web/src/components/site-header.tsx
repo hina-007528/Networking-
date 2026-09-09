@@ -75,7 +75,7 @@ export function SiteHeader({ settings }: { settings?: SiteSettingsDto | null }) 
             href={publicRoutes.getConnection}
             className="rounded-lg px-3 py-2 text-[#0C2340]/80 hover:bg-[#E8F3FC] hover:text-[#145DA0] transition-colors"
           >
-            Get Majawar X
+            Get Majawar X Network
           </Link>
         </nav>
 

@@ -217,7 +217,7 @@ const tvFeatures: SeedPlanFeature[] = [
 
 const voiceFeatures: SeedPlanFeature[] = [
   { label: 'Landline number', value: 'Included', iconKey: 'phone', highlighted: true },
-  { label: 'On-net calls', value: 'Free between StormFiber lines', iconKey: 'phone-call' },
+  { label: 'On-net calls', value: 'Free between Majawar X Network lines', iconKey: 'phone-call' },
   { label: 'Billing', value: 'Postpaid — no top-ups', iconKey: 'receipt' },
   { label: 'Works without mobile signal', value: 'Yes', iconKey: 'signal' },
 ];
@@ -583,7 +583,7 @@ export const seedPlans: SeedPlan[] = [
     installationPrice: 2500,
     shortDescription: 'A postpaid landline on fibre with 200 free minutes.',
     description:
-      'A landline that does not depend on mobile coverage. Calls between StormFiber lines are free, and you pay monthly instead of topping up.',
+      'A landline that does not depend on mobile coverage. Calls between Majawar X Network lines are free, and you pay monthly instead of topping up.',
     addonSlugs: ['voice-bundle-500'],
     features: voiceFeatures,
   },
@@ -688,7 +688,7 @@ export const seedProducts = [
     displayOrder: 3,
     seoTitle: 'Crystal Clear Voice — Home Phone on Fibre',
     seoDescription:
-      'A clear, reliable postpaid landline on fibre, with free calls between StormFiber lines and no top-ups.',
+      'A clear, reliable postpaid landline on fibre, with free calls between Majawar X Network lines and no top-ups.',
     features: [
       {
         title: 'No mobile signal, no problem',
@@ -709,7 +709,7 @@ export const seedProducts = [
       },
       {
         title: 'Free on-net calls',
-        description: 'Calls between any two StormFiber voice lines are free, with no minute limit.',
+        description: 'Calls between any two Majawar X Network voice lines are free, with no minute limit.',
         iconKey: 'phone-call',
       },
     ],

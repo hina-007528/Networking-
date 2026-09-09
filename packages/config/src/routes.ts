@@ -134,7 +134,7 @@ export const primaryNavigation: NavItem[] = [
       { label: 'Get in Touch', href: publicRoutes.contact },
     ],
   },
-  { label: 'Get Majawar X', href: publicRoutes.getConnection },
+  { label: 'Get Majawar X Network', href: publicRoutes.getConnection },
 ];
 
 export const utilityNavigation: NavItem[] = [

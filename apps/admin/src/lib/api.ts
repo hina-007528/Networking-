@@ -1,3 +1,4 @@
+import { replaceLegacyBrandCopy } from '@stormfiber/config';
 import type { ApiResponse, AuthSessionDto, Paginated } from '@stormfiber/types';
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api/v1').replace(
@@ -99,7 +100,7 @@ async function request<T>(path: string, init: RequestInit): Promise<T> {
     throw new ApiClientError(userFacingApiError(payload.error), payload.error.code, response.status);
   }
 
-  return payload.data;
+  return replaceLegacyBrandCopy(payload.data);
 }
 
 function unreachableApiError(): ApiClientError {

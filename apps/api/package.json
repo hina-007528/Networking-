@@ -2,7 +2,7 @@
   "name": "@stormfiber/api",
   "version": "1.0.0",
   "private": true,
-  "description": "StormFiber platform REST API",
+  "description": "Majawar X Network platform REST API",
   "main": "dist/apps/api/src/main.js",
   "scripts": {
     "build": "nest build && tsc-alias -p tsconfig.build.json",

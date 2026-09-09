@@ -8,7 +8,7 @@
 
 export const seedFaqCategories = [
   {
-    name: 'About StormFiber',
+    name: 'About Majawar X Network',
     slug: 'about',
     description: 'Who we are, what we sell and where we operate.',
     iconKey: 'info',
@@ -54,16 +54,16 @@ export const seedFaqCategories = [
 export const seedFaqs = [
   {
     categorySlug: 'about',
-    question: 'What is StormFiber?',
+    question: 'What is Majawar X Network?',
     slug: 'what-is-stormfiber',
     answer:
-      'StormFiber is a fibre-to-the-home provider delivering internet, high-definition television and voice over a single 100% fibre-optic line. Because the fibre runs all the way to your wall socket rather than stopping at a street cabinet, upload speeds match download speeds and performance stays consistent at peak hours.',
+      'Majawar X Network is a fibre-to-the-home provider delivering internet, high-definition television and voice over a single 100% fibre-optic line. Because the fibre runs all the way to your wall socket rather than stopping at a street cabinet, upload speeds match download speeds and performance stays consistent at peak hours.',
     tags: ['about', 'network'],
     displayOrder: 1,
   },
   {
     categorySlug: 'about',
-    question: 'In which cities is StormFiber available?',
+    question: 'In which cities is Majawar X Network available?',
     slug: 'which-cities-is-stormfiber-available-in',
     answer:
       'We operate in more than twenty cities across Pakistan. Coverage is built neighbourhood by neighbourhood, so a city being live does not mean every area within it is served yet. Use the availability checker to confirm your specific area — it reads the live coverage map rather than a city-level assumption.',
@@ -81,7 +81,7 @@ export const seedFaqs = [
   },
   {
     categorySlug: 'getting-connected',
-    question: 'How do I check whether StormFiber is available at my address?',
+    question: 'How do I check whether Majawar X Network is available at my address?',
     slug: 'how-to-check-availability',
     answer:
       'Open the availability checker, choose your city, then your area and sub-area. We resolve your selection against our coverage map and return one of three results: available, coming soon with an expected live date, or not available yet. In the last two cases you can leave your details and we will contact you as soon as the position changes.',
@@ -93,7 +93,7 @@ export const seedFaqs = [
     question: 'How do I apply for a new connection?',
     slug: 'how-to-apply-for-a-new-connection',
     answer:
-      'Use the Get StormFiber form. You enter your name and contact details, verify your mobile number with a one-time code, confirm your location, pick your services, plan and any add-ons, and review a full price breakdown before you accept the terms and submit. You receive an application reference immediately and can track its progress from your portal.',
+      'Use the Get Majawar X Network form. You enter your name and contact details, verify your mobile number with a one-time code, confirm your location, pick your services, plan and any add-ons, and review a full price breakdown before you accept the terms and submit. You receive an application reference immediately and can track its progress from your portal.',
     tags: ['application', 'signup'],
     displayOrder: 2,
   },

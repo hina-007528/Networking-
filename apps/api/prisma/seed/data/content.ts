@@ -54,7 +54,7 @@ export const seedHeroSlides = [
     imageAlt: 'Promotional artwork for the Monsoon Surge offer',
     primaryCtaLabel: 'View the offer',
     primaryCtaHref: '/offers/monsoon-surge',
-    secondaryCtaLabel: 'Get StormFiber',
+    secondaryCtaLabel: 'Get Majawar X Network',
     secondaryCtaHref: '/get-stormfiber',
     theme: SlideTheme.DARK,
     status: PublishStatus.PUBLISHED,
@@ -187,7 +187,7 @@ export const seedCmsSections = [
     headingAccent: 'future?',
     subheading:
       'Check your area, pick a plan and we will handle the rest. Installation is usually scheduled within a few days of approval.',
-    ctaLabel: 'Get StormFiber',
+    ctaLabel: 'Get Majawar X Network',
     ctaHref: '/get-stormfiber',
     status: PublishStatus.PUBLISHED,
     displayOrder: 7,
@@ -256,13 +256,13 @@ export const seedCmsPages = [
   {
     slug: 'terms-and-conditions',
     title: 'Terms and Conditions',
-    excerpt: 'The terms that govern your use of StormFiber services.',
+    excerpt: 'The terms that govern your use of Majawar X Network services.',
     status: PublishStatus.PUBLISHED,
     seoTitle: 'Terms and Conditions',
-    seoDescription: 'The terms and conditions governing StormFiber internet, television and voice services.',
+    seoDescription: 'The terms and conditions governing Majawar X Network internet, television and voice services.',
     body: `## 1. Scope
 
-These terms govern the supply of internet, television and voice services by StormFiber ("we", "us")
+These terms govern the supply of internet, television and voice services by Majawar X Network ("we", "us")
 to you ("the customer"). By submitting an application or using the services you accept these terms.
 
 ## 2. Service provision
@@ -349,7 +349,7 @@ charges or rights, notified to you directly.`,
     excerpt: 'What personal data we collect, why we collect it and how we protect it.',
     status: PublishStatus.PUBLISHED,
     seoTitle: 'Privacy Policy',
-    seoDescription: 'How StormFiber collects, uses, stores and protects your personal information.',
+    seoDescription: 'How Majawar X Network collects, uses, stores and protects your personal information.',
     body: `## What we collect
 
 To supply and bill the services we collect your name, contact details, service address, the last
@@ -453,9 +453,9 @@ Edit this page in the admin CMS whenever the company story changes.`,
 ];
 
 export const seedSiteSettings = {
-  brandName: 'StormFiber',
-  supportPhone: '111-1-78676',
-  supportEmail: 'help@stormfiber.local',
+  brandName: 'Majawar X Network',
+  supportPhone: '0303 0002291',
+  supportEmail: 'info@majawarxnetworks.online',
   announcement: {
     message: 'Monsoon Surge is live — 20% off your first three months on selected plans.',
     href: '/offers/monsoon-surge',
@@ -480,7 +480,7 @@ export const seedSiteSettings = {
       title: 'Get connected',
       links: [
         { label: 'Check availability', href: '/check-availability', external: false },
-        { label: 'Get StormFiber', href: '/get-stormfiber', external: false },
+        { label: 'Get Majawar X Network', href: '/get-stormfiber', external: false },
         { label: 'Coverage map', href: '/coverage', external: false },
         { label: 'Compare plans', href: '/plans/compare', external: false },
       ],
@@ -504,5 +504,5 @@ export const seedSiteSettings = {
     },
   ],
   footerNote:
-    'StormFiber is a demonstration platform built as an original implementation. Plans, pricing and coverage shown here are development data.',
+    'Majawar X Network is a demonstration platform built as an original implementation. Plans, pricing and coverage shown here are development data.',
 };

@@ -79,7 +79,7 @@ export const environmentSchema = z
     SMS_PROVIDER: z.enum(['console', 'http']).default('console'),
     SMS_API_URL: z.string().optional(),
     SMS_API_KEY: z.string().optional(),
-    SMS_SENDER_ID: z.string().default('StormFiber'),
+    SMS_SENDER_ID: z.string().default('MajawarX'),
 
     WHATSAPP_ADMIN: z.string().default('+923030002291'),
     WHATSAPP_ACCESS_TOKEN: z.string().optional(),

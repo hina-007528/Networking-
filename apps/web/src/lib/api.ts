@@ -1,3 +1,4 @@
+import { replaceLegacyBrandCopy } from '@stormfiber/config';
 import type { ApiResponse, AuthSessionDto, Paginated } from '@stormfiber/types';
 
 export function readItems<T>(payload: Paginated<T> | { items: T[] } | T[] | null | undefined): T[] {
@@ -116,7 +117,7 @@ async function request<T>(path: string, init: RequestInit): Promise<T> {
     throw new ApiClientError(userFacingApiError(payload.error), payload.error.code, response.status);
   }
 
-  return payload.data;
+  return replaceLegacyBrandCopy(payload.data);
 }
 
 async function authorizedFetch(path: string, init: RequestInit, retried = false): Promise<Response> {

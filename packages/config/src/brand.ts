@@ -66,6 +66,26 @@ export const seo = {
   twitterHandle: '@majawar_x_network',
 } as const;
 
+/** Rewrites leftover StormFiber marketing copy without touching URLs, paths, or emails. */
+export function replaceLegacyBrandText(value: string): string {
+  if (!value.includes('StormFiber')) return value;
+  if (value.startsWith('/') || /^https?:\/\//i.test(value) || value.includes('@')) return value;
+  return value.replaceAll('StormFiber', 'Majawar X Network');
+}
+
+export function replaceLegacyBrandCopy<T>(value: T): T {
+  if (typeof value === 'string') return replaceLegacyBrandText(value) as T;
+  if (Array.isArray(value)) return value.map((item) => replaceLegacyBrandCopy(item)) as T;
+  if (value && typeof value === 'object') {
+    const next: Record<string, unknown> = {};
+    for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
+      next[key] = replaceLegacyBrandCopy(nested);
+    }
+    return next as T;
+  }
+  return value;
+}
+
 export const preferredTimeOptions = [
   { value: 'MORNING', label: 'Morning (9am – 12pm)' },
   { value: 'AFTERNOON', label: 'Afternoon (12pm – 4pm)' },

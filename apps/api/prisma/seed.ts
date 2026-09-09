@@ -16,7 +16,7 @@ const prisma = new PrismaClient();
 
 async function main(): Promise<void> {
   const startedAt = Date.now();
-  console.log('Seeding StormFiber development data\n');
+  console.log('Seeding Majawar X Network development data\n');
 
   console.log('Access control');
   const staff = await seedRbac(prisma);

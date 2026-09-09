@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PublishStatus, type Prisma } from '@prisma/client';
-import { brand, publicRoutes } from '@stormfiber/config';
+import { brand, publicRoutes, replaceLegacyBrandCopy } from '@stormfiber/config';
 import type {
   CmsPageDto,
   CmsSectionDto,
@@ -220,7 +220,7 @@ export class CmsService {
     }
 
     const value = stored.value as Partial<SiteSettingsDto>;
-    return {
+    return replaceLegacyBrandCopy({
       brandName: value.brandName ?? defaults.brandName,
       logoUrl: value.logoUrl ?? defaults.logoUrl,
       supportPhone: value.supportPhone ?? defaults.supportPhone,
@@ -229,7 +229,7 @@ export class CmsService {
       socialLinks: value.socialLinks ?? defaults.socialLinks,
       footerColumns: value.footerColumns ?? defaults.footerColumns,
       footerNote: value.footerNote ?? defaults.footerNote,
-    };
+    });
   }
 
   private toSlideDto(row: {
