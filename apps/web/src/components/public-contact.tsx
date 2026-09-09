@@ -19,8 +19,7 @@ export function PublicContact({ className = '', tone = 'light' }: PublicContactP
     { label: 'WhatsApp', href: brand.whatsappUrl, value: brand.whatsappDisplay },
   ];
   const emails = [
-    { label: 'Email', href: `mailto:${brand.officeEmail}`, value: brand.officeEmail },
-    { label: 'Office', href: `mailto:${brand.supportEmail}`, value: brand.supportEmail },
+    { label: 'Email', href: `mailto:${brand.supportEmail}`, value: brand.supportEmail },
   ];
 
   return (

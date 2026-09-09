@@ -14,7 +14,7 @@ export const brand = {
   whatsappDisplay: '0303 0002291',
   whatsappE164: '+923030002291',
   whatsappUrl: 'https://wa.me/923030002291',
-  officeEmail: 'infomajawarxnetworks@gmail.com',
+  officeEmail: 'info@majawarxnetworks.online',
   supportEmail: 'info@majawarxnetworks.online',
   salesEmail: 'ceo@majawarxnetworks.online',
   adminEmails: ['ceo@majawarxnetworks.online', 'info@majawarxnetworks.online'] as const,
